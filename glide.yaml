@@ -1,0 +1,3 @@
+package: github.com/huangchunhua/storemain
+import:
+- package: github.com/golang/glog
