@@ -8,6 +8,7 @@ import (
 )
 
 var Commands = []*Command{
+	DNModule,
 	Version,
 }
 

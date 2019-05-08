@@ -1,4 +1,4 @@
-package disk
+package diskopt
 
 type Disk struct {
 	Locations       []*Location

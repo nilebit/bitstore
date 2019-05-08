@@ -3,9 +3,9 @@ package volume
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/disk/replica"
-	"github.com/nilebit/bitstore/disk/ttl"
-	"github.com/nilebit/bitstore/disk/version"
+	"github.com/nilebit/bitstore/diskopt/replica"
+	"github.com/nilebit/bitstore/diskopt/ttl"
+	"github.com/nilebit/bitstore/diskopt/version"
 	"github.com/nilebit/bitstore/util"
 	"os"
 )

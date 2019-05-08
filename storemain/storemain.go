@@ -34,9 +34,7 @@ func setExitStatus(n int) {
 var usageTemplate = `
 Bitstore
 
-Usage:
-
-	store module [arguments]
+Usage: store module [arguments]
 
 The module are:
 {{range .}}{{if .Runnable}}

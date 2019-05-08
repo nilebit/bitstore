@@ -1,8 +1,8 @@
-package disk
+package diskopt
 
 import (
 	"fmt"
-	"github.com/nilebit/bitstore/disk/volume"
+	"github.com/nilebit/bitstore/diskopt/volume"
 	"io/ioutil"
 	"os"
 	"strings"

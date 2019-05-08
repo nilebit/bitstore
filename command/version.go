@@ -12,8 +12,8 @@ const (
 var Version = &Command{
 	Run:       runVersion,
 	UsageLine: "version",
-	Short:     "Print Version",
-	Long:      `Version prints the storemain`,
+	Short:     "print version",
+	Long:      `version prints the bitstore`,
 }
 
 func runVersion(cmd *Command, args []string) bool {

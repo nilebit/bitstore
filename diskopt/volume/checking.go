@@ -2,8 +2,8 @@ package volume
 
 import (
 	"fmt"
-	"github.com/nilebit/bitstore/disk/needle"
-	"github.com/nilebit/bitstore/disk/version"
+	"github.com/nilebit/bitstore/diskopt/needle"
+	"github.com/nilebit/bitstore/diskopt/version"
 	"os"
 )
 

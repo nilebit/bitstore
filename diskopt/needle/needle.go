@@ -3,9 +3,9 @@ package needle
 import (
 	"errors"
 	"fmt"
-	"github.com/nilebit/bitstore/disk/crc"
-	"github.com/nilebit/bitstore/disk/ttl"
-	"github.com/nilebit/bitstore/disk/version"
+	"github.com/nilebit/bitstore/diskopt/crc"
+	"github.com/nilebit/bitstore/diskopt/ttl"
+	"github.com/nilebit/bitstore/diskopt/version"
 	"github.com/nilebit/bitstore/util"
 	"math"
 	"os"
