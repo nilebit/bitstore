@@ -1,5 +1,5 @@
 BINARY = ./store
-package = git.xiaojukeji.com/huangchunhua/bitstore
+package = git.xiaojukeji.com/nilebit/bitstore
 
 GO_FLAGS = #-v
 SOURCE_DIR = ./

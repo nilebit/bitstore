@@ -3,10 +3,10 @@ package volume
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/huangchunhua/bitstore/disk/replica"
-	"github.com/huangchunhua/bitstore/disk/ttl"
-	"github.com/huangchunhua/bitstore/disk/version"
-	"github.com/huangchunhua/bitstore/util"
+	"github.com/nilebit/bitstore/disk/replica"
+	"github.com/nilebit/bitstore/disk/ttl"
+	"github.com/nilebit/bitstore/disk/version"
+	"github.com/nilebit/bitstore/util"
 	"os"
 )
 

@@ -2,7 +2,7 @@ package needle
 
 import (
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/huangchunhua/bitstore/util"
+	"github.com/nilebit/bitstore/util"
 	"sync/atomic"
 )
 

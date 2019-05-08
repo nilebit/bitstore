@@ -3,15 +3,14 @@ package volume
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/huangchunhua/bitstore/disk/ttl"
+	"github.com/nilebit/bitstore/disk/needle"
+	"github.com/nilebit/bitstore/disk/replica"
+	"github.com/nilebit/bitstore/disk/ttl"
 	"os"
 	"path"
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/huangchunhua/bitstore/disk/needle"
-	"github.com/huangchunhua/bitstore/disk/replica"
 )
 
 type VIDType uint32

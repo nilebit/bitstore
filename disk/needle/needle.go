@@ -3,10 +3,10 @@ package needle
 import (
 	"errors"
 	"fmt"
-	"github.com/huangchunhua/bitstore/disk/crc"
-	"github.com/huangchunhua/bitstore/disk/ttl"
-	"github.com/huangchunhua/bitstore/disk/version"
-	"github.com/huangchunhua/bitstore/util"
+	"github.com/nilebit/bitstore/disk/crc"
+	"github.com/nilebit/bitstore/disk/ttl"
+	"github.com/nilebit/bitstore/disk/version"
+	"github.com/nilebit/bitstore/util"
 	"math"
 	"os"
 )

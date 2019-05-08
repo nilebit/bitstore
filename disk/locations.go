@@ -2,13 +2,13 @@ package disk
 
 import (
 	"fmt"
+	"github.com/nilebit/bitstore/disk/volume"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
 
 	"github.com/golang/glog"
-	"github.com/huangchunhua/bitstore/disk/volume"
 )
 
 type Location struct {

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/huangchunhua/bitstore/storemain"
+import "github.com/nilebit/bitstore/storemain"
 
 func main() {
 	storemain.Main()

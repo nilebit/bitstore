@@ -3,7 +3,7 @@ package needle
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/huangchunhua/bitstore/util"
+	"github.com/nilebit/bitstore/util"
 	"io"
 	"io/ioutil"
 	"os"

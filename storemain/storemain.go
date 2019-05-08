@@ -3,6 +3,8 @@ package storemain
 import (
 	"flag"
 	"fmt"
+	"github.com/nilebit/bitstore/command"
+	"github.com/nilebit/bitstore/logs"
 	"html/template"
 	"io"
 	"math/rand"
@@ -14,8 +16,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang/glog"
-	"github.com/huangchunhua/bitstore/command"
-	"github.com/huangchunhua/bitstore/logs"
 )
 
 var modules = command.Commands
@@ -36,13 +36,13 @@ Bitstore
 
 Usage:
 
-	 storemain module [arguments]
+	store module [arguments]
 
 The module are:
 {{range .}}{{if .Runnable}}
     {{.Name | printf "%-11s"}} {{.Short}}{{end}}{{end}}
 
-Use "storemain help [command]" for more information about a command.
+Use "store help [command]" for more information about a command.
 
 `
 
@@ -74,7 +74,7 @@ func printUsage(w io.Writer) {
 
 func usage() {
 	printUsage(os.Stderr)
-	fmt.Fprintf(os.Stderr, "For Logging, use \"storemain [logging_options] [command]\". The logging options are:\n")
+	fmt.Fprintf(os.Stderr, "For Logging, use \"store [logging_options] [command]\". The logging options are:\n")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -85,7 +85,7 @@ func help(args []string) {
 		return
 	}
 	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "usage: storemain help command\n\nToo many arguments given.\n")
+		fmt.Fprintf(os.Stderr, "usage: store help command\n\nToo many arguments given.\n")
 		os.Exit(2)
 	}
 
@@ -98,7 +98,7 @@ func help(args []string) {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "Bitstore：Unknown help topic %#q.  Run 'storemain help'.\n", arg)
+	fmt.Fprintf(os.Stderr, "Bitstore：Unknown help topic %#q.  Run 'store help'.\n", arg)
 	os.Exit(2)
 }
 
@@ -153,7 +153,7 @@ func Main() {
 			return
 		}
 	}
-	fmt.Fprintf(os.Stderr, "Bitstore: unknown module %q\nRun 'storemain help' for usage.\n", args[0])
+	fmt.Fprintf(os.Stderr, "Bitstore: unknown module %q\nRun 'store help' for usage.\n", args[0])
 	setExitStatus(2)
 	exit()
 }
