@@ -66,7 +66,7 @@ func VolumeFileName(collection string, dir string, id int) (fileName string) {
 	return
 }
 
-func checkFile(filename string) (exists, canRead, canWrite bool, modTime time.Time) {
+func checkFile(filename string) (exists, canRead, canWrite bool, modTime time.Time, fileSize int64) {
 	exists = true
 	fi, err := os.Stat(filename)
 	if os.IsNotExist(err) {
@@ -80,6 +80,7 @@ func checkFile(filename string) (exists, canRead, canWrite bool, modTime time.Ti
 		canWrite = true
 	}
 	modTime = fi.ModTime()
+	fileSize = fi.Size()
 	return
 }
 
@@ -104,8 +105,8 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 	var e error
 	fileName := VolumeFileName(v.Collection, v.dir, int(v.Id))
 	alreadyHasSuperBlock := false
-
-	if exists, canRead, canWrite, modifiedTime := checkFile(fileName + ".dat"); exists {
+	exists, canRead, canWrite, modifiedTime, fileSize := checkFile(fileName + ".dat")
+	if exists {
 		if !canRead {
 			return fmt.Errorf("cannot read Volume Data file %s.dat", fileName)
 		}
@@ -116,6 +117,9 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 			glog.V(0).Infoln("opening " + fileName + ".dat in READONLY mode")
 			v.dataFile, e = os.Open(fileName + ".dat")
 			v.readOnly = true
+		}
+		if fileSize >= SuperBlockSize {
+			alreadyHasSuperBlock = true
 		}
 	} else {
 		if createDatIfMissing {

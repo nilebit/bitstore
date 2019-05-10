@@ -2,8 +2,6 @@ package diskopt
 
 type Disk struct {
 	Locations       []*Location
-	dataCenter      string
-	rack            string
 }
 
 // NewDisk 新建磁盘

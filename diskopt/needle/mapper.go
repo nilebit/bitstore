@@ -85,7 +85,7 @@ func NewCompactNeedleMap(file *os.File) *NeedleMap {
 	return nm
 }
 
-func idxFileEntry(bytes []byte) (key uint64, offset uint32, size uint32) {
+func IdxFileEntry(bytes []byte) (key uint64, offset uint32, size uint32) {
 	key = util.BytesToUint64(bytes[:8])
 	offset = util.BytesToUint32(bytes[8:12])
 	size = util.BytesToUint32(bytes[12:16])
@@ -108,7 +108,7 @@ func WalkIndexFile(r *os.File, fn func(key uint64, offset, size uint32) error) e
 
 	for count > 0 && e == nil || e == io.EOF {
 		for i = 0; i+16 <= count; i += 16 {
-			key, offset, size = idxFileEntry(bytes[i : i+16])
+			key, offset, size = IdxFileEntry(bytes[i : i+16])
 			if e = fn(key, offset, size); e != nil {
 				return e
 			}

@@ -59,8 +59,8 @@ func CheckDataIntegrity(v *Volume, indexFile *os.File) error {
 	if lastIdxEntry, e = readIndexEntryAtOffset(indexFile, indexSize-needle.IndexSize); e != nil {
 		return fmt.Errorf("readLastIndexEntry %s failed: %v", indexFile.Name(), e)
 	}
-	key, offset, size := idxFileEntry(lastIdxEntry)
-	if offset == 0 || size == TombstoneFileSize {
+	key, offset, size := needle.IdxFileEntry(lastIdxEntry)
+	if offset == 0 || size == needle.TombstoneFileSize {
 		return nil
 	}
 	if e = verifyNeedleIntegrity(v.dataFile, v.Version(), int64(offset)*needle.PaddingSize, key, size); e != nil {

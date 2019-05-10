@@ -48,7 +48,7 @@ func ParseSuperBlock(header []byte) (superBlock SuperBlock, err error) {
 	if superBlock.ReplicaPlacement, err = replica.NewPlacementFromByte(header[1]); err != nil {
 		err = fmt.Errorf("cannot read replica type: %s", err.Error())
 	}
-	superBlock.Ttl = ttl.LoadTTLFromBytes(header[2:4])
+	superBlock.Ttl = ttl.LoadFromBytes(header[2:4])
 	superBlock.CompactRevision = util.BytesToUint16(header[4:6])
 	return
 }

@@ -68,23 +68,19 @@ func (l *Location) loadExistingVolume(dir os.FileInfo, mutex *sync.RWMutex) {
 	}
 }
 
-func (l *Location) concurrentLoadingVolumes(concurrentFlag bool) {
-	var concurrency int
-	if concurrentFlag {
-		//You could choose a better optimized concurency value after testing at your environment
-		concurrency = 10
-	} else {
-		concurrency = 1
-	}
+func (l *Location) loadExistingVolumes() {
+	var concurrency = 10
+	l.Lock()
+	defer l.Unlock()
 
-	task_queue := make(chan os.FileInfo, 10*concurrency)
+	taskQueue := make(chan os.FileInfo, 10 * concurrency)
 	go func() {
 		if dirs, err := ioutil.ReadDir(l.Directory); err == nil {
 			for _, dir := range dirs {
-				task_queue <- dir
+				taskQueue <- dir
 			}
 		}
-		close(task_queue)
+		close(taskQueue)
 	}()
 
 	var wg sync.WaitGroup
@@ -93,22 +89,14 @@ func (l *Location) concurrentLoadingVolumes(concurrentFlag bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for dir := range task_queue {
+			for dir := range taskQueue {
 				l.loadExistingVolume(dir, &mutex)
 			}
 		}()
 	}
 	wg.Wait()
 
-}
-
-func (l *Location) loadExistingVolumes() {
-	l.Lock()
-	defer l.Unlock()
-
-	l.concurrentLoadingVolumes(true)
-
-	glog.V(0).Infoln("Store started on dir:", l.Directory, "with", len(l.volumes), "volumes", "max", l.MaxVolumeCount)
+	glog.V(0).Infoln("Disk started on dir:", l.Directory, "with", len(l.volumes), "volumes", "max", l.MaxVolumeCount)
 }
 
 

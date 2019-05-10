@@ -3,6 +3,7 @@ package diskserver
 import (
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
+	"github.com/nilebit/bitstore/diskopt"
 	"net/http"
 	"strconv"
 )
@@ -24,6 +25,7 @@ type DiskServer struct {
 	FolderMaxLimits       []int
 	Debug                 *bool
 	Router          	  *mux.Router
+	Disks			  	  *diskopt.Disk
 	DiskNodeMapper
 }
 
@@ -41,7 +43,7 @@ func (s *DiskServer)RegistRouter() {
 }
 
 func (s *DiskServer)CreateDiskOpt() {
-
+	s.Disks = diskopt.NewDisk(s.Folders, s.FolderMaxLimits)
 	return
 }
 
