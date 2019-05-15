@@ -85,7 +85,7 @@ func (s *DiskServer)PostHandler(w http.ResponseWriter, r *http.Request) {
 		writeJsonError(w, r, http.StatusBadRequest, ve)
 		return
 	}
-	needle,originalSize, ne := needle.NewNeedle(r)
+	needle, originalSize, ne := needle.NewNeedle(r)
 	if ne != nil {
 		writeJsonError(w, r, http.StatusBadRequest, ne)
 		return

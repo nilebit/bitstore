@@ -16,8 +16,8 @@ type Disk struct {
 }
 
 // NewDisk 新建磁盘
-func NewDisk(dirNames []string, maxVolumeCounts []int) (v *Disk) {
-	v = &Disk{}
+func NewDisk(dirNames []string, maxVolumeCounts []int, ip string, port int) (v *Disk) {
+	v = &Disk{Ip:ip, Port:port}
 	v.Locations = make([]*Location, 0)
 	for i := 0; i < len(dirNames); i++ {
 		location := NewLocation(dirNames[i], maxVolumeCounts[i])

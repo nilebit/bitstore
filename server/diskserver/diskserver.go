@@ -45,7 +45,7 @@ func (s *DiskServer)RegistRouter() {
 }
 
 func (s *DiskServer)CreateDiskOpt() {
-	s.Disks = diskopt.NewDisk(s.Folders, s.FolderMaxLimits)
+	s.Disks = diskopt.NewDisk(s.Folders, s.FolderMaxLimits, *s.Ip, *s.Port)
 	return
 }
 
