@@ -5,6 +5,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
 	"github.com/nilebit/bitstore/diskopt/volume"
+	"github.com/nilebit/bitstore/util"
 )
 
 type Disk struct {
@@ -26,7 +27,7 @@ func NewDisk(dirNames []string, maxVolumeCounts []int) (v *Disk) {
 	return
 }
 
-func (d *Disk) FindVolume(vid volume.VIDType) *volume.Volume {
+func (d *Disk) FindVolume(vid util.VIDType) *volume.Volume {
 	for _, location := range d.Locations {
 		if v, found := location.FindVolume(vid); found {
 			return v
@@ -35,7 +36,7 @@ func (d *Disk) FindVolume(vid volume.VIDType) *volume.Volume {
 	return nil
 }
 
-func (d *Disk) Write(i volume.VIDType, n *needle.Needle) (size uint32, isUnchanged bool, err error) {
+func (d *Disk) Write(i util.VIDType, n *needle.Needle) (size uint32, isUnchanged bool, err error) {
 	if v := d.FindVolume(i); v != nil {
 		if v.ReadOnly {
 			err = fmt.Errorf("Volume %d is read only", i)
@@ -54,7 +55,7 @@ func (d *Disk) Write(i volume.VIDType, n *needle.Needle) (size uint32, isUnchang
 	return
 }
 
-func (d *Disk) HasVolume(i volume.VIDType) bool {
+func (d *Disk) HasVolume(i util.VIDType) bool {
 	v := d.FindVolume(i)
 	return v != nil
 }

@@ -3,6 +3,7 @@ package diskopt
 import (
 	"fmt"
 	"github.com/nilebit/bitstore/diskopt/volume"
+	"github.com/nilebit/bitstore/util"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -14,17 +15,17 @@ import (
 type Location struct {
 	Directory      	string
 	MaxVolumeCount 	int
-	volumes        	map[volume.VIDType]*volume.Volume
+	volumes        	map[util.VIDType]*volume.Volume
 	sync.RWMutex
 }
 
 func NewLocation(dir string, maxVolumeCount int) *Location {
 	location := &Location{Directory: dir, MaxVolumeCount: maxVolumeCount}
-	location.volumes = make(map[volume.VIDType]*volume.Volume)
+	location.volumes = make(map[util.VIDType]*volume.Volume)
 	return location
 }
 
-func (l *Location) volumeIdFromPath(dir os.FileInfo) (volume.VIDType, string, error) {
+func (l *Location) volumeIdFromPath(dir os.FileInfo) (util.VIDType, string, error) {
 	name := dir.Name()
 	if dir.IsDir() || !strings.HasSuffix(name, ".dat") {
 		return 0, "", fmt.Errorf("Path is not a volume: %s", name)
@@ -36,7 +37,7 @@ func (l *Location) volumeIdFromPath(dir os.FileInfo) (volume.VIDType, string, er
 	if i > 0 {
 		collection, base = base[0:i], base[i+1:]
 	}
-	vol, err := volume.NewVolumeId(base)
+	vol, err := util.NewVolumeId(base)
 
 	return vol, collection, err
 }
@@ -99,7 +100,7 @@ func (l *Location) loadExistingVolumes() {
 	glog.V(0).Infoln("Disk started on dir:", l.Directory, "with", len(l.volumes), "volumes", "max", l.MaxVolumeCount)
 }
 
-func (l *Location) FindVolume(vid volume.VIDType) (*volume.Volume, bool) {
+func (l *Location) FindVolume(vid util.VIDType) (*volume.Volume, bool) {
 	l.RLock()
 	defer l.RUnlock()
 

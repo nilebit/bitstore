@@ -16,10 +16,8 @@ import (
 	"time"
 )
 
-type VIDType uint32
-
 type Volume struct {
-	Id         VIDType
+	Id         util.VIDType
 	dir        string
 	Collection string
 	dataFile   *os.File
@@ -35,21 +33,8 @@ type Volume struct {
 	lastCompactRevision    uint16
 }
 
-func NewVolumeId(vid string) (VIDType, error) {
-	volumeId, err := strconv.ParseUint(vid, 10, 64)
-	return VIDType(volumeId), err
-}
 
-func (vid *VIDType) String() string {
-	return strconv.FormatUint(uint64(*vid), 10)
-}
-
-func (vid *VIDType) Next() VIDType {
-	return VIDType(uint32(*vid) + 1)
-}
-
-
-func NewVolume(dirname string, collection string, id VIDType,
+func NewVolume(dirname string, collection string, id util.VIDType,
 	replicaPlacement *replicate.Placement,
 	ttl *ttl.TTL, preallocate int64) (v *Volume, e error) {
 
@@ -180,12 +165,12 @@ func (v *Volume) ContentSize() uint64 {
 }
 
 type FileId struct {
-	VolumeId VIDType
+	VolumeId util.VIDType
 	Key      uint64
 	Hashcode uint32
 }
 
-func NewFileIdFromNeedle(VolumeId VIDType, n *needle.Needle) *FileId {
+func NewFileIdFromNeedle(VolumeId util.VIDType, n *needle.Needle) *FileId {
 	return &FileId{VolumeId: VolumeId, Key: n.Id, Hashcode: n.Cookie}
 }
 

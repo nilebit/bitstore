@@ -3,10 +3,10 @@ package security
 import (
 	"github.com/golang/glog"
 
+	"github.com/dgrijalva/jwt-go"
 	"net/http"
 	"strings"
 	"time"
-	jwt "github.com/dgrijalva/jwt-go"
 )
 
 type EncodedJwt string

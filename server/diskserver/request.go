@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
-	"github.com/nilebit/bitstore/diskopt/replicate"
-	"github.com/nilebit/bitstore/diskopt/volume"
+	"github.com/nilebit/bitstore/util"
 	"net/http"
 	"path/filepath"
 	"runtime"
@@ -80,7 +79,7 @@ func (s *DiskServer)PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vid, _, _, _, _ := parseURLPath(r.URL.Path)
-	volumeId, ve := volume.NewVolumeId(vid)
+	volumeId, ve := util.NewVolumeId(vid)
 	if ve != nil {
 		glog.V(0).Infoln("NewVolumeId error:", ve)
 		writeJsonError(w, r, http.StatusBadRequest, ve)
@@ -94,7 +93,8 @@ func (s *DiskServer)PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	ret := UploadResult{}
 
-	_, isUnchanged, writeError := replicate.Write(s.CurrentLeader, s.Disks, volumeId, needle, r)
+	// 写入数据并同步多备份
+	_, isUnchanged, writeError := s.ReplicatedWrite(s.CurrentLeader, volumeId, needle, r)
 	httpStatus := http.StatusCreated
 	if isUnchanged {
 		httpStatus = http.StatusNotModified

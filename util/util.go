@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -13,6 +14,20 @@ var (
 	Transport *http.Transport
 )
 
+type VIDType uint32
+
+func NewVolumeId(vid string) (VIDType, error) {
+	volumeId, err := strconv.ParseUint(vid, 10, 64)
+	return VIDType(volumeId), err
+}
+
+func (vid *VIDType) String() string {
+	return strconv.FormatUint(uint64(*vid), 10)
+}
+
+func (vid *VIDType) Next() VIDType {
+	return VIDType(uint32(*vid) + 1)
+}
 
 func Post(url string, values url.Values) ([]byte, error) {
 	r, err := client.PostForm(url, values)

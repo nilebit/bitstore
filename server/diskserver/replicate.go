@@ -1,4 +1,4 @@
-package replicate
+package diskserver
 
 import (
 	"bytes"
@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/diskopt"
 	"github.com/nilebit/bitstore/diskopt/needle"
-	"github.com/nilebit/bitstore/diskopt/volume"
 	"github.com/nilebit/bitstore/security"
 	"github.com/nilebit/bitstore/util"
 	"io"
@@ -139,64 +137,28 @@ func (dr DistributedOperationResult) Error() error {
 	return errors.New(strings.Join(errs, "\n"))
 }
 
-func distributedOperation(masterNode string, d *diskopt.Disk, volumeId volume.VIDType, op func(location Location) error) error {
-	if lookupResult, lookupErr := Lookup(masterNode, volumeId.String()); lookupErr == nil {
-		length := 0
-		selfUrl := (d.Ip + ":" + strconv.Itoa(d.Port))
-		results := make(chan RemoteResult)
-		for _, location := range lookupResult.Locations {
-			if location.Url != selfUrl {
-				length++
-				go func(location Location, results chan RemoteResult) {
-					results <- RemoteResult{location.Url, op(location)}
-				}(location, results)
-			}
-		}
-		ret := DistributedOperationResult(make(map[string]error))
-		for i := 0; i < length; i++ {
-			result := <-results
-			ret[result.Host] = result.Error
-		}
-		if volume :=d.FindVolume(volumeId); volume != nil {
-			if length+1 < volume.ReplicaPlacement.GetCopyCount() {
-				return fmt.Errorf("replicating opetations [%d] is less than volume's replication copy count [%d]", length+1, volume.ReplicaPlacement.GetCopyCount())
-			}
-		}
-		return ret.Error()
-	} else {
-		glog.V(0).Infoln()
-		return fmt.Errorf("Failed to lookup for %d: %v", volumeId, lookupErr)
-	}
-}
-
-type UploadResult struct {
-	Name  string `json:"name,omitempty"`
-	Size  uint32 `json:"size,omitempty"`
-	Error string `json:"error,omitempty"`
-}
-
-func Write(masterNode string, d *diskopt.Disk, volumeId volume.VIDType,
-	n *needle.Needle, r *http.Request) (size uint32, isUnchanged bool, errorStatus error) {
-	//check JWT
+func (s *DiskServer)ReplicatedWrite(masterNode string, volumeId util.VIDType, n *needle.Needle, r *http.Request) (size uint32, isUnchanged bool, errorStatus error) {
+	// 检查JWT
 	jwt := security.GetJwt(r)
 
-	size, isUnchanged, err := d.Write(volumeId, n)
+	// 写入数据
+	size, isUnchanged, err := s.Disks.Write(volumeId, n)
 	if err != nil {
 		errorStatus = fmt.Errorf("failed to write to local disk: %v", err)
 		return
 	}
 
-	needToReplicate := !d.HasVolume(volumeId)
-	needToReplicate = needToReplicate || d.FindVolume(volumeId).NeedToReplicate()
+	needToReplicate := !s.Disks.HasVolume(volumeId)
+	needToReplicate = needToReplicate || s.Disks.FindVolume(volumeId).NeedToReplicate()
 	if !needToReplicate {
-		needToReplicate = d.FindVolume(volumeId).NeedToReplicate()
+		needToReplicate = s.Disks.FindVolume(volumeId).NeedToReplicate()
 	}
 
 	if !needToReplicate || r.FormValue("type") == "replicate" {
 		return
 	}
-
-	if err = distributedOperation(masterNode, d, volumeId,
+	// 分布写入数据
+	if err = s.DistributedOperation(masterNode, volumeId,
 		func(location Location) error {
 			u := url.URL{Scheme: "http", Host: location.Url, Path: r.URL.Path,}
 			q := url.Values{"type": {"replicate"},}
@@ -227,6 +189,37 @@ func Write(masterNode string, d *diskopt.Disk, volumeId volume.VIDType,
 	}
 
 	return
+}
+
+func (s *DiskServer)DistributedOperation(masterNode string, volumeId util.VIDType, op func(location Location) error) error {
+	var d = s.Disks
+	if lookupResult, lookupErr := Lookup(masterNode, volumeId.String()); lookupErr == nil {
+		length := 0
+		selfUrl := (d.Ip + ":" + strconv.Itoa(d.Port))
+		results := make(chan RemoteResult)
+		for _, location := range lookupResult.Locations {
+			if location.Url != selfUrl {
+				length++
+				go func(location Location, results chan RemoteResult) {
+					results <- RemoteResult{location.Url, op(location)}
+				}(location, results)
+			}
+		}
+		ret := DistributedOperationResult(make(map[string]error))
+		for i := 0; i < length; i++ {
+			result := <-results
+			ret[result.Host] = result.Error
+		}
+		if volume :=d.FindVolume(volumeId); volume != nil {
+			if length+1 < volume.ReplicaPlacement.GetCopyCount() {
+				return fmt.Errorf("replicating opetations [%d] is less than volume's replication copy count [%d]", length+1, volume.ReplicaPlacement.GetCopyCount())
+			}
+		}
+		return ret.Error()
+	} else {
+		glog.V(0).Infoln()
+		return fmt.Errorf("Failed to lookup for %d: %v", volumeId, lookupErr)
+	}
 }
 
 func Upload(uploadUrl string, filename string, reader io.Reader, isGzipped bool, mtype string, pairMap map[string]string, jwt security.EncodedJwt) (*UploadResult, error) {
