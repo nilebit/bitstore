@@ -260,16 +260,16 @@ func uploadContent(uploadUrl string, fillBufferFunction func(w io.Writer) error,
 		h.Set("Authorization", "BEARER "+string(jwt))
 	}
 
-	file_writer, cp_err := bodyWriter.CreatePart(h)
-	if cp_err != nil {
-		glog.V(0).Infoln("error creating form file", cp_err.Error())
-		return nil, cp_err
+	fileWriter, cpErr := bodyWriter.CreatePart(h)
+	if cpErr != nil {
+		glog.V(0).Infoln("error creating form file", cpErr.Error())
+		return nil, cpErr
 	}
-	if err := fillBufferFunction(file_writer); err != nil {
+	if err := fillBufferFunction(fileWriter); err != nil {
 		glog.V(0).Infoln("error copying data", err)
 		return nil, err
 	}
-	content_type := bodyWriter.FormDataContentType()
+	contentType := bodyWriter.FormDataContentType()
 	if err := bodyWriter.Close(); err != nil {
 		glog.V(0).Infoln("error closing body", err)
 		return nil, err
@@ -280,25 +280,25 @@ func uploadContent(uploadUrl string, fillBufferFunction func(w io.Writer) error,
 		glog.V(0).Infoln("failing to upload to", uploadUrl, postErr.Error())
 		return nil, postErr
 	}
-	req.Header.Set("Content-Type", content_type)
+	req.Header.Set("Content-Type", contentType)
 	for k, v := range pairMap {
 		req.Header.Set(k, v)
 	}
-	resp, post_err := client.Do(req)
-	if post_err != nil {
-		glog.V(0).Infoln("failing to upload to", uploadUrl, post_err.Error())
-		return nil, post_err
+	resp, postErr := client.Do(req)
+	if postErr != nil {
+		glog.V(0).Infoln("failing to upload to", uploadUrl, postErr.Error())
+		return nil, postErr
 	}
 	defer resp.Body.Close()
-	resp_body, ra_err := ioutil.ReadAll(resp.Body)
-	if ra_err != nil {
-		return nil, ra_err
+	respBody, raErr := ioutil.ReadAll(resp.Body)
+	if raErr != nil {
+		return nil, raErr
 	}
 	var ret UploadResult
-	unmarshal_err := json.Unmarshal(resp_body, &ret)
-	if unmarshal_err != nil {
-		glog.V(0).Infoln("failing to read upload response", uploadUrl, string(resp_body))
-		return nil, unmarshal_err
+	unmarshalErr := json.Unmarshal(respBody, &ret)
+	if unmarshalErr != nil {
+		glog.V(0).Infoln("failing to read upload response", uploadUrl, string(respBody))
+		return nil, unmarshalErr
 	}
 	if ret.Error != "" {
 		return nil, errors.New(ret.Error)

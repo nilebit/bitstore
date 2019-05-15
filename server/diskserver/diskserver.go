@@ -39,7 +39,7 @@ func (s *DiskServer)RegistRouter() {
 	paramMux := mux.NewRouter().SkipClean(false)
 	apiRouter := paramMux.NewRoute().PathPrefix("/").Subrouter()
 	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.StatusHandler)
-	apiRouter.Methods("PUT","POST").Path("/").HandlerFunc(s.PostHandler)
+	apiRouter.Methods("PUT","POST").Path("/{object:.+}").HandlerFunc(s.PostHandler)
 
 	s.Router = apiRouter
 }
