@@ -3,7 +3,7 @@ package volume
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/diskopt/replica"
+	"github.com/nilebit/bitstore/diskopt/replicate"
 	"github.com/nilebit/bitstore/diskopt/ttl"
 	"github.com/nilebit/bitstore/diskopt/version"
 	"github.com/nilebit/bitstore/util"
@@ -24,7 +24,7 @@ const (
  */
 type SuperBlock struct {
 	version          version.Version
-	ReplicaPlacement *replica.Placement
+	ReplicaPlacement *replicate.Placement
 	Ttl              *ttl.TTL
 	CompactRevision  uint16
 }
@@ -45,7 +45,7 @@ func (s *SuperBlock) Bytes() []byte {
 
 func ParseSuperBlock(header []byte) (superBlock SuperBlock, err error) {
 	superBlock.version = version.Version(header[0])
-	if superBlock.ReplicaPlacement, err = replica.NewPlacementFromByte(header[1]); err != nil {
+	if superBlock.ReplicaPlacement, err = replicate.NewPlacementFromByte(header[1]); err != nil {
 		err = fmt.Errorf("cannot read replica type: %s", err.Error())
 	}
 	superBlock.Ttl = ttl.LoadFromBytes(header[2:4])
@@ -78,7 +78,7 @@ func (v *Volume) maybeWriteSuperBlock() error {
 			//read-only, but zero length - recreate it!
 			if v.dataFile, e = os.Create(v.dataFile.Name()); e == nil {
 				if _, e = v.dataFile.Write(v.SuperBlock.Bytes()); e == nil {
-					v.readOnly = false
+					v.ReadOnly = false
 				}
 			}
 		}

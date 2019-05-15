@@ -1,4 +1,4 @@
-package replica
+package replicate
 
 import (
 	"errors"
@@ -38,4 +38,8 @@ func NewPlacementFromByte(b byte) (*Placement, error) {
 func (rp *Placement) Byte() byte {
 	ret := rp.DiffDataCenterCount*100 + rp.DiffRackCount*10 + rp.SameRackCount
 	return byte(ret)
+}
+
+func (rp *Placement) GetCopyCount() int {
+	return rp.DiffDataCenterCount + rp.DiffRackCount + rp.SameRackCount + 1
 }

@@ -1,4 +1,16 @@
-package: github.com/huangchunhua/storemain
+package: github.com/nilebit/bitstore
 import:
+- package: github.com/dgrijalva/jwt-go
 - package: github.com/golang/glog
+- package: github.com/gorilla/mux
+- package: github.com/hashicorp/golang-lru
+- package: github.com/klauspost/crc32
 - package: go.etcd.io/etcd
+  subpackages:
+  - etcdserver/api/rafthttp
+  - etcdserver/api/snap
+  - pkg/types
+  - raft
+  - raft/raftpb
+  - wal
+  - wal/walpb

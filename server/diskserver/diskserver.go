@@ -11,7 +11,7 @@ import (
 type DiskNodeMapper interface {
 	RegistRouter()
 	CreateDiskOpt()
-	StartServer()
+	StartServer() bool
 }
 
 type DiskServer struct {
@@ -26,6 +26,8 @@ type DiskServer struct {
 	Debug                 *bool
 	Router          	  *mux.Router
 	Disks			  	  *diskopt.Disk
+	CurrentLeader         string
+	ManageNode			  []string
 	DiskNodeMapper
 }
 
@@ -36,10 +38,10 @@ func NewDiskServer() *DiskServer {
 func (s *DiskServer)RegistRouter() {
 	paramMux := mux.NewRouter().SkipClean(false)
 	apiRouter := paramMux.NewRoute().PathPrefix("/").Subrouter()
-	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.Status)
-	s.Router = apiRouter
+	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.StatusHandler)
+	apiRouter.Methods("PUT","POST").Path("/").HandlerFunc(s.PostHandler)
 
-	return
+	s.Router = apiRouter
 }
 
 func (s *DiskServer)CreateDiskOpt() {
@@ -47,11 +49,14 @@ func (s *DiskServer)CreateDiskOpt() {
 	return
 }
 
-func (s *DiskServer) StartServer() {
+func (s *DiskServer) StartServer() bool {
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
 	glog.V(0).Infoln("Start a disk server ", "at", listeningAddress)
 
 	if err := http.ListenAndServe(listeningAddress, s.Router); err != nil {
 		glog.Fatalf("service fail to serve: %v", err)
+		return false
 	}
+
+	return true
 }

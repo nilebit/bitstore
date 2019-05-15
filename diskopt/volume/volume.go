@@ -1,11 +1,14 @@
 package volume
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
-	"github.com/nilebit/bitstore/diskopt/replica"
+	"github.com/nilebit/bitstore/diskopt/replicate"
 	"github.com/nilebit/bitstore/diskopt/ttl"
+	"github.com/nilebit/bitstore/util"
 	"os"
 	"path"
 	"strconv"
@@ -16,12 +19,12 @@ import (
 type VIDType uint32
 
 type Volume struct {
-	Id            VIDType
-	dir           string
-	Collection    string
-	dataFile      *os.File
-	nm            needle.Mapper
-	readOnly      bool
+	Id         VIDType
+	dir        string
+	Collection string
+	dataFile   *os.File
+	nm         needle.Mapper
+	ReadOnly   bool
 
 	SuperBlock
 
@@ -47,7 +50,7 @@ func (vid *VIDType) Next() VIDType {
 
 
 func NewVolume(dirname string, collection string, id VIDType,
-	replicaPlacement *replica.Placement,
+	replicaPlacement *replicate.Placement,
 	ttl *ttl.TTL, preallocate int64) (v *Volume, e error) {
 
 	v = &Volume{dir: dirname, Collection: collection, Id: id}
@@ -116,7 +119,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 		} else {
 			glog.V(0).Infoln("opening " + fileName + ".dat in READONLY mode")
 			v.dataFile, e = os.Open(fileName + ".dat")
-			v.readOnly = true
+			v.ReadOnly = true
 		}
 		if fileSize >= SuperBlockSize {
 			alreadyHasSuperBlock = true
@@ -145,7 +148,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 
 	if e == nil && alsoLoadIndex {
 		var indexFile *os.File
-		if v.readOnly {
+		if v.ReadOnly {
 			glog.V(1).Infoln("open to read file", fileName+".idx")
 			if indexFile, e = os.OpenFile(fileName+".idx", os.O_RDONLY, 0644); e != nil {
 				return fmt.Errorf("cannot read Volume Index %s.idx: %v", fileName, e)
@@ -158,11 +161,11 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 		}
 
 		if e = CheckDataIntegrity(v, indexFile); e != nil {
-			v.readOnly = true
+			v.ReadOnly = true
 			glog.V(0).Infof("volumeDataIntegrityChecking failed %v", e)
 		}
 
-		glog.V(0).Infoln("loading index", fileName+".idx", "to memory readonly", v.readOnly)
+		glog.V(0).Infoln("loading index", fileName+".idx", "to memory readonly", v.ReadOnly)
 		if v.nm, e = needle.LoadCompactNeedleMap(indexFile); e != nil {
 			glog.V(0).Infof("loading index %s to memory error: %v", fileName+".idx", e)
 		}
@@ -170,4 +173,106 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 	}
 
 	return e
+}
+
+func (v *Volume) ContentSize() uint64 {
+	return v.nm.ContentSize()
+}
+
+type FileId struct {
+	VolumeId VIDType
+	Key      uint64
+	Hashcode uint32
+}
+
+func NewFileIdFromNeedle(VolumeId VIDType, n *needle.Needle) *FileId {
+	return &FileId{VolumeId: VolumeId, Key: n.Id, Hashcode: n.Cookie}
+}
+
+func (n *FileId) String() string {
+	bytes := make([]byte, 12)
+	util.Uint64toBytes(bytes[0:8], n.Key)
+	util.Uint32toBytes(bytes[8:12], n.Hashcode)
+	nonzeroIndex := 0
+	for ; bytes[nonzeroIndex] == 0; nonzeroIndex++ {
+	}
+	return n.VolumeId.String() + "," + hex.EncodeToString(bytes[nonzeroIndex:])
+}
+
+// isFileUnchanged checks whether this needle to write is same as last one.
+// It requires serialized access in the same volume.
+func (v *Volume) isFileUnchanged(n *needle.Needle) bool {
+	if v.Ttl.String() != "" {
+		return false
+	}
+	nv, ok := v.nm.Get(n.Id)
+	if ok && nv.Offset > 0 {
+		oldNeedle := new(needle.Needle)
+		err := oldNeedle.ReadData(v.dataFile, int64(nv.Offset)*needle.PaddingSize, nv.Size, v.Version())
+		if err != nil {
+			glog.V(0).Infof("Failed to check updated file %v", err)
+			return false
+		}
+		defer oldNeedle.ReleaseMemory()
+		if oldNeedle.Checksum == n.Checksum && bytes.Equal(oldNeedle.Data, n.Data) {
+			n.DataSize = oldNeedle.DataSize
+			return true
+		}
+	}
+	return false
+}
+
+func (v *Volume) WriteNeedle(n *needle.Needle) (size uint32, isUnchanged bool, err error) {
+	glog.V(4).Infof("writing needle %s", NewFileIdFromNeedle(v.Id, n).String())
+	if v.ReadOnly {
+		err = fmt.Errorf("%s is read-only", v.dataFile.Name())
+		return
+	}
+	v.dataFileAccessLock.Lock()
+	defer v.dataFileAccessLock.Unlock()
+
+	if v.isFileUnchanged(n) {
+		size = n.DataSize
+		glog.V(4).Infof("needle is unchanged!")
+		isUnchanged = true
+		return
+	}
+
+	var offset int64
+	if offset, err = v.dataFile.Seek(0, 2); err != nil {
+		glog.V(0).Infof("failed to seek the end of file: %v", err)
+		return
+	}
+
+	//ensure file writing starting from aligned positions
+	if offset%needle.PaddingSize != 0 {
+		offset = offset + (needle.PaddingSize - offset%needle.PaddingSize)
+		if offset, err = v.dataFile.Seek(offset, 0); err != nil {
+			glog.V(0).Infof("failed to align in datafile %s: %v", v.dataFile.Name(), err)
+			return
+		}
+	}
+
+	if size, _, err = n.Append(v.dataFile, v.Version()); err != nil {
+		if e := v.dataFile.Truncate(offset); e != nil {
+			err = fmt.Errorf("%s\ncannot truncate %s: %v", err, v.dataFile.Name(), e)
+		}
+		return
+	}
+
+	nv, ok := v.nm.Get(n.Id)
+	if !ok || int64(nv.Offset)*needle.PaddingSize < offset {
+		if err = v.nm.Put(n.Id, uint32(offset/needle.PaddingSize), n.Size); err != nil {
+			glog.V(4).Infof("failed to save in needle map %d: %v", n.Id, err)
+		}
+	}
+	if v.lastModifiedTime < n.LastModified {
+		v.lastModifiedTime = n.LastModified
+	}
+	return
+}
+
+
+func (v *Volume) NeedToReplicate() bool {
+	return v.ReplicaPlacement.GetCopyCount() > 1
 }

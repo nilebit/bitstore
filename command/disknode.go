@@ -26,7 +26,7 @@ func init() {
 	dn.DataCenter = DNModule.Flag.String("dataCenter", "", "current dss server's data center name")
 	dn.Rack = DNModule.Flag.String("rack", "", "current volume server's rack name")
 	dn.Debug = DNModule.Flag.Bool("debug", false, "open debug")
-
+	dn.ManageNode = strings.Split(*DNModule.Flag.String("manageNode", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]..."), ",")
 	dn.Folders = strings.Split(*DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]..."), ",")
 	var tempFolderMaxLimits = strings.Split(*DNModule.Flag.String("max", "7", "maximum numbers of File, count[,count]..."), ",")
 	for _, maxString := range tempFolderMaxLimits {
@@ -38,7 +38,8 @@ func init() {
 	}
 }
 
-func RunDN(md *Command, args []string) bool {
+func RunDN(md *Command, args []string) (ret bool) {
+
 	if *dn.MaxCpu < 1 {
 		*dn.MaxCpu = runtime.NumCPU()
 	}
@@ -49,7 +50,7 @@ func RunDN(md *Command, args []string) bool {
 	}
 	dn.RegistRouter()
 	dn.CreateDiskOpt()
-	dn.StartServer()
+	ret = dn.StartServer()
 
-	return true
+	return ret
 }

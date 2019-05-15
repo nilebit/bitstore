@@ -1,14 +1,23 @@
 package needle
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/crc"
 	"github.com/nilebit/bitstore/diskopt/ttl"
 	"github.com/nilebit/bitstore/diskopt/version"
 	"github.com/nilebit/bitstore/util"
+	"io"
+	"io/ioutil"
 	"math"
+	"net/http"
 	"os"
+	"path"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const (
@@ -54,6 +63,201 @@ type Needle struct {
 	Padding  []byte `comment:"Aligned to 8 bytes"`
 
 	rawBlock *Block // underlying supporing []byte, fetched and released into a pool
+}
+
+func parseMultipart(r *http.Request) (
+	fileName string, data []byte, mimeType string, isGzipped bool, originalDataSize int, e error) {
+	defer func() {
+		if e != nil && r.Body != nil {
+			io.Copy(ioutil.Discard, r.Body)
+			r.Body.Close()
+		}
+	}()
+	form, fe := r.MultipartReader()
+	if fe != nil {
+		glog.V(0).Infoln("MultipartReader [ERROR]", fe)
+		e = fe
+		return
+	}
+
+	//first multi-part item
+	part, fe := form.NextPart()
+	if fe != nil {
+		glog.V(0).Infoln("Reading Multi part [ERROR]", fe)
+		e = fe
+		return
+	}
+
+	fileName = part.FileName()
+	if fileName != "" {
+		fileName = path.Base(fileName)
+	}
+
+	data, e = ioutil.ReadAll(part)
+	if e != nil {
+		glog.V(0).Infoln("Reading Content [ERROR]", e)
+		return
+	}
+
+	//if the filename is empty string, do a search on the other multi-part items
+	for fileName == "" {
+		part2, fe := form.NextPart()
+		if fe != nil {
+			break // no more or on error, just safely break
+		}
+
+		fName := part2.FileName()
+
+		//found the first <file type> multi-part has filename
+		if fName != "" {
+			data2, fe2 := ioutil.ReadAll(part2)
+			if fe2 != nil {
+				glog.V(0).Infoln("Reading Content [ERROR]", fe2)
+				e = fe2
+				return
+			}
+
+			//update
+			data = data2
+			fileName = path.Base(fName)
+			break
+		}
+	}
+
+	originalDataSize = len(data)
+
+	return
+}
+
+func ParseUpload(r *http.Request) (
+	fileName string, data []byte,
+	mimeType string, pairMap map[string]string,
+	isGzipped bool, originalDataSize int,
+	modifiedTime uint64,
+	TL *ttl.TTL,
+	e error) {
+
+	pairMap = make(map[string]string)
+	for k, v := range r.Header {
+		if len(v) > 0 && strings.HasPrefix(k, PairNamePrefix) {
+			pairMap[k] = v[0]
+		}
+	}
+	if r.Method == "POST" {
+		fileName, data, mimeType, isGzipped, originalDataSize, e = parseMultipart(r)
+	} else {
+		isGzipped = false
+		mimeType = r.Header.Get("Content-Type")
+		fileName = ""
+		data, e = ioutil.ReadAll(r.Body)
+		originalDataSize = len(data)
+	}
+	if e != nil {
+		return
+	}
+
+	modifiedTime, _ = strconv.ParseUint(r.FormValue("ts"), 10, 64)
+	TL, _ = ttl.ReadTTL(r.FormValue("ttl"))
+
+	return
+}
+
+func ParseKeyHash(key_hash_string string) (uint64, uint32, error) {
+	if len(key_hash_string) <= 8 {
+		return 0, 0, fmt.Errorf("KeyHash is too short.")
+	}
+	if len(key_hash_string) > 24 {
+		return 0, 0, fmt.Errorf("KeyHash is too long.")
+	}
+	split := len(key_hash_string) - 8
+	key, err := strconv.ParseUint(key_hash_string[:split], 16, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("Parse key error: %v", err)
+	}
+	hash, err := strconv.ParseUint(key_hash_string[split:], 16, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("Parse hash error: %v", err)
+	}
+	return key, uint32(hash), nil
+}
+
+func (n *Needle) ParsePath(fid string) (err error) {
+	length := len(fid)
+	if length <= 8 {
+		return fmt.Errorf("Invalid fid: %s", fid)
+	}
+	delta := ""
+	deltaIndex := strings.LastIndex(fid, "_")
+	if deltaIndex > 0 {
+		fid, delta = fid[0:deltaIndex], fid[deltaIndex+1:]
+	}
+	n.Id, n.Cookie, err = ParseKeyHash(fid)
+	if err != nil {
+		return err
+	}
+	if delta != "" {
+		if d, e := strconv.ParseUint(delta, 10, 64); e == nil {
+			n.Id += d
+		} else {
+			return e
+		}
+	}
+	return err
+}
+
+func NewNeedle(r *http.Request) (n *Needle, originalSize int, e error) {
+	var pairMap map[string]string
+	fName, mimeType, isGzipped := "", "", false
+	n = new(Needle)
+	fName, n.Data, mimeType, pairMap, isGzipped, originalSize, n.LastModified, n.Ttl, e = ParseUpload(r)
+	if e != nil {
+		return
+	}
+	if len(fName) < 256 {
+		n.Name = []byte(fName)
+		n.SetHasName()
+	}
+	if len(mimeType) < 256 {
+		n.Mime = []byte(mimeType)
+		n.SetHasMime()
+	}
+	if len(pairMap) != 0 {
+		trimmedPairMap := make(map[string]string)
+		for k, v := range pairMap {
+			trimmedPairMap[k[len(PairNamePrefix):]] = v
+		}
+
+		pairs, _ := json.Marshal(trimmedPairMap)
+		if len(pairs) < 65536 {
+			n.Pairs = pairs
+			n.PairsSize = uint16(len(pairs))
+			n.SetHasPairs()
+		}
+	}
+	if isGzipped {
+		n.SetGzipped()
+	}
+	if n.LastModified == 0 {
+		n.LastModified = uint64(time.Now().Unix())
+	}
+	n.SetHasLastModifiedDate()
+	if n.Ttl != ttl.EMPTY_TTL {
+		n.SetHasTtl()
+	}
+
+	// TODO
+	n.Checksum = crc.New(n.Data)
+
+	commaSep := strings.LastIndex(r.URL.Path, ",")
+	dotSep := strings.LastIndex(r.URL.Path, ".")
+	fid := r.URL.Path[commaSep+1:]
+	if dotSep > 0 {
+		fid = r.URL.Path[commaSep+1 : dotSep]
+	}
+
+	e = n.ParsePath(fid)
+
+	return
 }
 
 func getActualSize(size uint32) int64 {
@@ -214,4 +418,141 @@ func (n *Needle) HasPairs() bool {
 
 func (n *Needle) SetHasPairs() {
 	n.Flags = n.Flags | FlagHasPairs
+}
+
+func (n *Needle) Etag() string {
+	bits := make([]byte, 4)
+	util.Uint32toBytes(bits, uint32(n.Checksum))
+	return fmt.Sprintf("\"%x\"", bits)
+}
+
+func (n *Needle) ReleaseMemory() {
+	if n.rawBlock != nil {
+		n.rawBlock.decreaseReference()
+	}
+}
+
+func (n *Needle) Append(w io.Writer, vers version.Version) (size uint32, actualSize int64, err error) {
+	if s, ok := w.(io.Seeker); ok {
+		if end, e := s.Seek(0, 1); e == nil {
+			defer func(s io.Seeker, off int64) {
+				if err != nil {
+					if _, e = s.Seek(off, 0); e != nil {
+						glog.V(0).Infof("Failed to seek %s back to %d with error: %v", w, off, e)
+					}
+				}
+			}(s, end)
+		} else {
+			err = fmt.Errorf("Cannot Read Current Volume Position: %v", e)
+			return
+		}
+	}
+	switch vers {
+	case version.Version1:
+		header := make([]byte, HeaderSize)
+		util.Uint32toBytes(header[0:4], n.Cookie)
+		util.Uint64toBytes(header[4:12], n.Id)
+		n.Size = uint32(len(n.Data))
+		size = n.Size
+		util.Uint32toBytes(header[12:16], n.Size)
+		if _, err = w.Write(header); err != nil {
+			return
+		}
+		if _, err = w.Write(n.Data); err != nil {
+			return
+		}
+		actualSize = HeaderSize + int64(n.Size)
+		padding := PaddingSize - ((HeaderSize + n.Size + ChecksumSize) % PaddingSize)
+		util.Uint32toBytes(header[0:ChecksumSize], n.Checksum.Value())
+		_, err = w.Write(header[0:ChecksumSize+padding])
+		return
+	case version.Version2:
+		header := make([]byte, HeaderSize)
+		util.Uint32toBytes(header[0:4], n.Cookie)
+		util.Uint64toBytes(header[4:12], n.Id)
+		n.DataSize, n.NameSize, n.MimeSize = uint32(len(n.Data)), uint8(len(n.Name)), uint8(len(n.Mime))
+		if n.DataSize > 0 {
+			n.Size = 4 + n.DataSize + 1
+			if n.HasName() {
+				n.Size = n.Size + 1 + uint32(n.NameSize)
+			}
+			if n.HasMime() {
+				n.Size = n.Size + 1 + uint32(n.MimeSize)
+			}
+			if n.HasLastModifiedDate() {
+				n.Size = n.Size + LastModifiedBytesLength
+			}
+			if n.HasTtl() {
+				n.Size = n.Size + TtlBytesLength
+			}
+			if n.HasPairs() {
+				n.Size += 2 + uint32(n.PairsSize)
+			}
+		} else {
+			n.Size = 0
+		}
+		size = n.DataSize
+		util.Uint32toBytes(header[12:16], n.Size)
+		if _, err = w.Write(header); err != nil {
+			return
+		}
+		if n.DataSize > 0 {
+			util.Uint32toBytes(header[0:4], n.DataSize)
+			if _, err = w.Write(header[0:4]); err != nil {
+				return
+			}
+			if _, err = w.Write(n.Data); err != nil {
+				return
+			}
+			util.Uint8toBytes(header[0:1], n.Flags)
+			if _, err = w.Write(header[0:1]); err != nil {
+				return
+			}
+			if n.HasName() {
+				util.Uint8toBytes(header[0:1], n.NameSize)
+				if _, err = w.Write(header[0:1]); err != nil {
+					return
+				}
+				if _, err = w.Write(n.Name); err != nil {
+					return
+				}
+			}
+			if n.HasMime() {
+				util.Uint8toBytes(header[0:1], n.MimeSize)
+				if _, err = w.Write(header[0:1]); err != nil {
+					return
+				}
+				if _, err = w.Write(n.Mime); err != nil {
+					return
+				}
+			}
+			if n.HasLastModifiedDate() {
+				util.Uint64toBytes(header[0:8], n.LastModified)
+				if _, err = w.Write(header[8-LastModifiedBytesLength : 8]); err != nil {
+					return
+				}
+			}
+			if n.HasTtl() && n.Ttl != nil {
+				n.Ttl.ToBytes(header[0:TtlBytesLength])
+				if _, err = w.Write(header[0:TtlBytesLength]); err != nil {
+					return
+				}
+			}
+			if n.HasPairs() {
+				util.Uint16toBytes(header[0:2], n.PairsSize)
+				if _, err = w.Write(header[0:2]); err != nil {
+					return
+				}
+				if _, err = w.Write(n.Pairs); err != nil {
+					return
+				}
+			}
+		}
+		padding := PaddingSize - ((HeaderSize + n.Size + ChecksumSize) % PaddingSize)
+		util.Uint32toBytes(header[0:ChecksumSize], n.Checksum.Value())
+		_, err = w.Write(header[0:ChecksumSize+padding])
+
+		return n.DataSize, getActualSize(n.Size), err
+	}
+	return 0, 0, fmt.Errorf("Unsupported Version! (%d)", vers)
 }

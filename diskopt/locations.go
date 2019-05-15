@@ -99,5 +99,11 @@ func (l *Location) loadExistingVolumes() {
 	glog.V(0).Infoln("Disk started on dir:", l.Directory, "with", len(l.volumes), "volumes", "max", l.MaxVolumeCount)
 }
 
+func (l *Location) FindVolume(vid volume.VIDType) (*volume.Volume, bool) {
+	l.RLock()
+	defer l.RUnlock()
 
+	v, ok := l.volumes[vid]
+	return v, ok
+}
 

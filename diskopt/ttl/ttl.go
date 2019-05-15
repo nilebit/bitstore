@@ -7,6 +7,8 @@ type TTL struct {
 	unit  byte
 }
 
+var EMPTY_TTL = &TTL{}
+
 const (
 	//stored unit types
 	Empty byte = iota
@@ -29,6 +31,29 @@ func (t *TTL) ToBytes(output []byte) {
 	output[1] = t.unit
 }
 
+// translate a readable ttl to internal ttl
+// Supports format example:
+// 3m: 3 minutes
+// 4h: 4 hours
+// 5d: 5 days
+// 6w: 6 weeks
+// 7M: 7 months
+// 8y: 8 years
+func ReadTTL(ttlString string) (*TTL, error) {
+	if ttlString == "" {
+		return EMPTY_TTL, nil
+	}
+	ttlBytes := []byte(ttlString)
+	unitByte := ttlBytes[len(ttlBytes)-1]
+	countBytes := ttlBytes[0 : len(ttlBytes)-1]
+	if '0' <= unitByte && unitByte <= '9' {
+		countBytes = ttlBytes
+		unitByte = 'm'
+	}
+	count, err := strconv.Atoi(string(countBytes))
+	unit := toStoredByte(unitByte)
+	return &TTL{count: byte(count), unit: unit}, err
+}
 
 func (t *TTL) String() string {
 	if t == nil || t.count == 0 {
@@ -53,4 +78,22 @@ func (t *TTL) String() string {
 		return countString + "y"
 	}
 	return ""
+}
+
+func toStoredByte(readableUnitByte byte) byte {
+	switch readableUnitByte {
+	case 'm':
+		return Minute
+	case 'h':
+		return Hour
+	case 'd':
+		return Day
+	case 'w':
+		return Week
+	case 'M':
+		return Month
+	case 'y':
+		return Year
+	}
+	return 0
 }
