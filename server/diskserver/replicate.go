@@ -137,7 +137,8 @@ func (dr DistributedOperationResult) Error() error {
 	return errors.New(strings.Join(errs, "\n"))
 }
 
-func (s *DiskServer)ReplicatedWrite(masterNode string, volumeId util.VIDType, n *needle.Needle, r *http.Request) (size uint32, isUnchanged bool, errorStatus error) {
+func (s *DiskServer)ReplicatedWrite(masterNode string, volumeId util.VIDType, n *needle.Needle,
+	r *http.Request) (size uint32, isUnchanged bool, errorStatus error) {
 	// 检查JWT
 	jwt := security.GetJwt(r)
 
@@ -212,7 +213,8 @@ func (s *DiskServer)DistributedOperation(masterNode string, volumeId util.VIDTyp
 		}
 		if volume :=d.FindVolume(volumeId); volume != nil {
 			if length+1 < volume.ReplicaPlacement.GetCopyCount() {
-				return fmt.Errorf("replicating opetations [%d] is less than volume's replication copy count [%d]", length+1, volume.ReplicaPlacement.GetCopyCount())
+				return fmt.Errorf("replicating opetations [%d] is less than volume's replication copy count [%d]",
+					length+1, volume.ReplicaPlacement.GetCopyCount())
 			}
 		}
 		return ret.Error()
@@ -222,7 +224,8 @@ func (s *DiskServer)DistributedOperation(masterNode string, volumeId util.VIDTyp
 	}
 }
 
-func Upload(uploadUrl string, filename string, reader io.Reader, isGzipped bool, mtype string, pairMap map[string]string, jwt security.EncodedJwt) (*UploadResult, error) {
+func Upload(uploadUrl string, filename string, reader io.Reader, isGzipped bool, mtype string,
+	pairMap map[string]string, jwt security.EncodedJwt) (*UploadResult, error) {
 	return uploadContent(uploadUrl, func(w io.Writer) (err error) {
 		_, err = io.Copy(w, reader)
 		return
@@ -237,7 +240,8 @@ func init() {
 	client = &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 1024,}}
 }
 
-func uploadContent(uploadUrl string, fillBufferFunction func(w io.Writer) error, filename string, isGzipped bool, mtype string, pairMap map[string]string, jwt security.EncodedJwt) (*UploadResult, error) {
+func uploadContent(uploadUrl string, fillBufferFunction func(w io.Writer) error, filename string,
+	isGzipped bool, mtype string, pairMap map[string]string, jwt security.EncodedJwt) (*UploadResult, error) {
 	var fileNameEscaper = strings.NewReplacer("\\", "\\\\", "\"", "\\\"")
 	bodyBuf := bytes.NewBufferString("")
 	bodyWriter := multipart.NewWriter(bodyBuf)
