@@ -3,6 +3,8 @@ package diskserver
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
 	"github.com/nilebit/bitstore/util"
@@ -12,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -232,4 +235,52 @@ func (d *DiskServer)GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	return
+}
+
+func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	n := new(needle.Needle)
+	vid, fid, _, _, _ := parseURLPath(r.URL.Path)
+	volumeId, _ := util.NewVolumeId(vid)
+	n.ParsePath(fid)
+
+	cookie := n.Cookie
+
+	_, ok := d.Disks.ReadVolumeNeedle(volumeId, n)
+	if ok != nil {
+		m := make(map[string]uint32)
+		m["size"] = 0
+		if err := writeJson(w, r, http.StatusNotFound, m); err != nil {
+			glog.V(0).Infof("error writing JSON %+v status %d: %v", m, http.StatusNotFound, err)
+		}
+		return
+	}
+
+	if n.Cookie != cookie {
+		glog.V(0).Infoln("delete", r.URL.Path, "with unmaching cookie from ", r.RemoteAddr, "agent", r.UserAgent())
+		writeJsonError(w, r, http.StatusBadRequest, errors.New("File Random Cookie does not match."))
+		return
+	}
+
+	count := int64(n.Size)
+
+	n.LastModified = uint64(time.Now().Unix())
+	if len(r.FormValue("ts")) > 0 {
+		modifiedTime, err := strconv.ParseInt(r.FormValue("ts"), 10, 64)
+		if err == nil {
+			n.LastModified = uint64(modifiedTime)
+		}
+	}
+
+	_, err := d.ReplicatedDelete(d.CurrentLeader, volumeId, n, r)
+
+	if err == nil {
+		m := make(map[string]int64)
+		m["size"] = count
+		if err := writeJson(w, r, http.StatusAccepted, m); err != nil {
+			glog.V(0).Infof("error writing JSON %+v status %d: %v", m, http.StatusNotFound, err)
+		}
+	} else {
+		writeJsonError(w, r, http.StatusInternalServerError, fmt.Errorf("Deletion Failed: %v", err))
+	}
+
 }

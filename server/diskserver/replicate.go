@@ -305,3 +305,31 @@ func uploadContent(uploadUrl string, fillBufferFunction func(w io.Writer) error,
 	}
 	return &ret, nil
 }
+
+func (d *DiskServer)ReplicatedDelete(masterNode string,
+	volumeId util.VIDType, n *needle.Needle,r *http.Request) (uint32, error) {
+
+	//check JWT
+	jwt := security.GetJwt(r)
+
+	ret, err := d.Disks.Delete(volumeId, n)
+	if err != nil {
+		glog.V(0).Infoln("delete error:", err)
+		return ret, err
+	}
+
+	needToReplicate := !d.Disks.HasVolume(volumeId)
+	if !needToReplicate && ret > 0 {
+		needToReplicate = d.Disks.FindVolume(volumeId).NeedToReplicate()
+	}
+	if needToReplicate { //send to other replica locations
+		if r.FormValue("type") != "replicate" {
+			if err = d.DistributedOperation(masterNode, volumeId, func(location Location) error {
+				return util.Delete("http://"+location.Url+r.URL.Path+"?type=replicate", jwt)
+			}); err != nil {
+				ret = 0
+			}
+		}
+	}
+	return ret, err
+}

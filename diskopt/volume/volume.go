@@ -293,3 +293,28 @@ func (v *Volume) ReadNeedle(n *needle.Needle) (int, error) {
 	n.ReleaseMemory()
 	return -1, errors.New("Not Found")
 }
+
+func (v *Volume) DeleteNeedle(n *needle.Needle) (uint32, error) {
+	glog.V(4).Infof("delete needle %s", NewFileIdFromNeedle(v.Id, n).String())
+	if v.ReadOnly {
+		return 0, fmt.Errorf("%s is read-only", v.dataFile.Name())
+	}
+	v.dataFileAccessLock.Lock()
+	defer v.dataFileAccessLock.Unlock()
+	nv, ok := v.nm.Get(n.Id)
+	//fmt.Println("key", n.Id, "volume offset", nv.Offset, "data_size", n.Size, "cached size", nv.Size)
+	if ok && nv.Size != needle.TombstoneFileSize {
+		size := nv.Size
+		offset, err := v.dataFile.Seek(0, 2)
+		if err != nil {
+			return size, err
+		}
+		if err := v.nm.Delete(n.Id, uint32(offset/needle.PaddingSize)); err != nil {
+			return size, err
+		}
+		n.Data = nil
+		_, _, err = n.Append(v.dataFile, v.Version())
+		return size, err
+	}
+	return 0, nil
+}

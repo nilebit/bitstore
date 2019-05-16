@@ -3,8 +3,11 @@ package util
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/security"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -112,4 +115,34 @@ func UnGzipData(input []byte) ([]byte, error) {
 		glog.V(2).Infoln("error uncompressing data:", err)
 	}
 	return output, err
+}
+
+ func Delete(url string, jwt security.EncodedJwt) error {
+	req, err := http.NewRequest("DELETE", url, nil)
+	if jwt != "" {
+		req.Header.Set("Authorization", "BEARER "+string(jwt))
+	}
+	if err != nil {
+		return err
+	}
+	resp, e := client.Do(req)
+	if e != nil {
+		return e
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	switch resp.StatusCode {
+	case http.StatusNotFound, http.StatusAccepted, http.StatusOK:
+		return nil
+	}
+	m := make(map[string]interface{})
+	if e := json.Unmarshal(body, m); e == nil {
+		if s, ok := m["error"].(string); ok {
+			return errors.New(s)
+		}
+	}
+	return errors.New(string(body))
 }

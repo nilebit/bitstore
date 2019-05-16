@@ -66,3 +66,10 @@ func (d *Disk) ReadVolumeNeedle(i util.VIDType, n *needle.Needle) (int, error) {
 	}
 	return 0, fmt.Errorf("Volume %d not found!", i)
 }
+
+func (s *Disk) Delete(i util.VIDType, n *needle.Needle) (uint32, error) {
+	if v := s.FindVolume(i); v != nil && !v.ReadOnly {
+		return v.DeleteNeedle(n)
+	}
+	return 0, nil
+}

@@ -41,6 +41,7 @@ func (s *DiskServer)RegistRouter() {
 	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.StatusHandler)
 	apiRouter.Methods("PUT","POST").Path("/{object:.+}").HandlerFunc(s.PostHandler)
 	apiRouter.Methods("GET","HEAD").Path("/{object:.+}").HandlerFunc(s.GetHandler)
+	apiRouter.Methods("DELETE").Path("/{object:.+}").HandlerFunc(s.DeleteHandler)
 
 	s.Router = apiRouter
 }
