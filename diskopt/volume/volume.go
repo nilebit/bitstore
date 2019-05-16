@@ -3,6 +3,7 @@ package volume
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
@@ -260,4 +261,35 @@ func (v *Volume) WriteNeedle(n *needle.Needle) (size uint32, isUnchanged bool, e
 
 func (v *Volume) NeedToReplicate() bool {
 	return v.ReplicaPlacement.GetCopyCount() > 1
+}
+
+// read fills in Needle content by looking up n.Id from NeedleMapper
+func (v *Volume) ReadNeedle(n *needle.Needle) (int, error) {
+	nv, ok := v.nm.Get(n.Id)
+	if !ok || nv.Offset == 0 {
+		return -1, errors.New("Not Found")
+	}
+	if nv.Size == needle.TombstoneFileSize {
+		return -1, errors.New("Already Deleted")
+	}
+	err := n.ReadData(v.dataFile, int64(nv.Offset)*needle.PaddingSize, nv.Size, v.Version())
+	if err != nil {
+		return 0, err
+	}
+	bytesRead := len(n.Data)
+	if !n.HasTtl() {
+		return bytesRead, nil
+	}
+	ttlMinutes := n.Ttl.Minutes()
+	if ttlMinutes == 0 {
+		return bytesRead, nil
+	}
+	if !n.HasLastModifiedDate() {
+		return bytesRead, nil
+	}
+	if uint64(time.Now().Unix()) < n.LastModified+uint64(ttlMinutes*60) {
+		return bytesRead, nil
+	}
+	n.ReleaseMemory()
+	return -1, errors.New("Not Found")
 }

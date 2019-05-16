@@ -1,7 +1,10 @@
 package util
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"github.com/golang/glog"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -91,4 +94,22 @@ func Post(url string, values url.Values) ([]byte, error) {
 	}
 
 	return false, false
+}
+
+func NormalizeUrl(url string) string {
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		return url
+	}
+	return "http://" + url
+}
+
+func UnGzipData(input []byte) ([]byte, error) {
+	buf := bytes.NewBuffer(input)
+	r, _ := gzip.NewReader(buf)
+	defer r.Close()
+	output, err := ioutil.ReadAll(r)
+	if err != nil {
+		glog.V(2).Infoln("error uncompressing data:", err)
+	}
+	return output, err
 }

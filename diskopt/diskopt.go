@@ -59,3 +59,10 @@ func (d *Disk) HasVolume(i util.VIDType) bool {
 	v := d.FindVolume(i)
 	return v != nil
 }
+
+func (d *Disk) ReadVolumeNeedle(i util.VIDType, n *needle.Needle) (int, error) {
+	if v := d.FindVolume(i); v != nil {
+		return v.ReadNeedle(n)
+	}
+	return 0, fmt.Errorf("Volume %d not found!", i)
+}

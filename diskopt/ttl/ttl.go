@@ -97,3 +97,23 @@ func toStoredByte(readableUnitByte byte) byte {
 	}
 	return 0
 }
+
+func (t *TTL) Minutes() uint32 {
+	switch t.unit {
+	case Empty:
+		return 0
+	case Minute:
+		return uint32(t.count)
+	case Hour:
+		return uint32(t.count) * 60
+	case Day:
+		return uint32(t.count) * 60 * 24
+	case Week:
+		return uint32(t.count) * 60 * 24 * 7
+	case Month:
+		return uint32(t.count) * 60 * 24 * 31
+	case Year:
+		return uint32(t.count) * 60 * 24 * 365
+	}
+	return 0
+}
