@@ -1,5 +1,5 @@
-hash: a7ba9f0624791869bd66082391babd2f45c216ea7352a15d044ce19d525d1c5c
-updated: 2019-05-15T15:29:13.214138+08:00
+hash: 0329037bd70cb57c54503b8dc6349606bc16379cac0a017996631a9514f6efaa
+updated: 2019-05-16T21:16:27.720433+08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4b2b341e8d7715fae06375aa633dbb6e91b3fb46
@@ -30,9 +30,13 @@ imports:
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/protobuf
-  version: e91709a02e0e8ff8b86b7aa913fdc9ae9498e825
+  version: b5d812f8a3706043e23a9cd5babf2e5423744d30
   subpackages:
   - proto
+  - ptypes
+  - ptypes/any
+  - ptypes/duration
+  - ptypes/timestamp
 - name: github.com/gorilla/mux
   version: c5c6c98bc25355028a63748a498942a6398ccd22
 - name: github.com/hashicorp/golang-lru
@@ -98,12 +102,67 @@ imports:
   - internal/color
   - internal/exit
   - zapcore
+- name: golang.org/x/net
+  version: f9ce57c11b242f0f1599cf25c89d8cb02c45295a
+  subpackages:
+  - context
+  - http/httpguts
+  - http2
+  - http2/hpack
+  - idna
+  - internal/timeseries
+  - trace
+- name: golang.org/x/sys
+  version: b4a75ba826a64a70990f11a225237acd6ef35c9f
+  subpackages:
+  - unix
+- name: golang.org/x/text
+  version: f21a4dfb5e38f5895301dc265a8def02365cc3d0
+  subpackages:
+  - secure/bidirule
+  - transform
+  - unicode/bidi
+  - unicode/norm
 - name: golang.org/x/time
   version: 9d24e82272b4f38b78bc8cff74fa936d31ccd8ef
   subpackages:
   - rate
-- name: google.golang.org/grpc
-  version: 47e1ebe575df3e712691b4415f96ff3ab4db6a06
+- name: google.golang.org/genproto
+  version: 995ef27e003f584103ecdd0f98e1a0cc9cbf3395
   subpackages:
+  - googleapis/rpc/status
+- name: google.golang.org/grpc
+  version: 25c4f928eaa6d96443009bd842389fb4fa48664e
+  subpackages:
+  - balancer
+  - balancer/base
+  - balancer/roundrobin
+  - binarylog/grpc_binarylog_v1
+  - codes
+  - connectivity
+  - credentials
+  - credentials/internal
+  - encoding
+  - encoding/proto
   - grpclog
+  - internal
+  - internal/backoff
+  - internal/balancerload
+  - internal/binarylog
+  - internal/channelz
+  - internal/envconfig
+  - internal/grpcrand
+  - internal/grpcsync
+  - internal/syscall
+  - internal/transport
+  - keepalive
+  - metadata
+  - naming
+  - peer
+  - resolver
+  - resolver/dns
+  - resolver/passthrough
+  - stats
+  - status
+  - tap
 testImports: []

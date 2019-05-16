@@ -1,12 +1,13 @@
 package command
 
 import (
-	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/server/diskserver"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/server/diskserver"
 )
 
 var DNModule = &Command{
@@ -50,6 +51,7 @@ func RunDN(md *Command, args []string) (ret bool) {
 	}
 	dn.RegistRouter()
 	dn.CreateDiskOpt()
+
 	ret = dn.StartServer()
 
 	return ret

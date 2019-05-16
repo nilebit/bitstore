@@ -6,3 +6,7 @@ import:
 - package: github.com/hashicorp/golang-lru
 - package: github.com/klauspost/crc32
 - package: go.etcd.io/etcd
+- package: google.golang.org/grpc
+  version: ^1.20.1
+- package: github.com/golang/protobuf
+  version: v1.3.1

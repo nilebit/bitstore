@@ -5,19 +5,13 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/security"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
-)
 
-var (
-	client    *http.Client
-	Transport *http.Transport
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/security"
 )
 
 type VIDType uint32
@@ -34,27 +28,6 @@ func (vid *VIDType) String() string {
 func (vid *VIDType) Next() VIDType {
 	return VIDType(uint32(*vid) + 1)
 }
-
-func Post(url string, values url.Values) ([]byte, error) {
-	r, err := client.PostForm(url, values)
-	if err != nil {
-		return nil, err
-	}
-	defer r.Body.Close()
-	b, err := ioutil.ReadAll(r.Body)
-	if r.StatusCode >= 400 {
-		if err != nil {
-			return nil, fmt.Errorf("%s: %d - %s", url, r.StatusCode, string(b))
-		} else {
-			return nil, fmt.Errorf("%s: %s", url, r.Status)
-		}
-	}
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
 
 /*
 * Default more not to gzip since gzip can be done on client side.
@@ -117,7 +90,7 @@ func UnGzipData(input []byte) ([]byte, error) {
 	return output, err
 }
 
- func Delete(url string, jwt security.EncodedJwt) error {
+func Delete(url string, jwt security.EncodedJwt) error {
 	req, err := http.NewRequest("DELETE", url, nil)
 	if jwt != "" {
 		req.Header.Set("Authorization", "BEARER "+string(jwt))

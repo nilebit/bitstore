@@ -17,6 +17,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/diskopt/needle"
+	"github.com/nilebit/bitstore/util"
 )
 
 type UploadResult struct {
@@ -26,7 +30,7 @@ type UploadResult struct {
 	ETag  string `json:"eTag,omitempty"`
 }
 
-func (s *DiskServer)StatusHandler(w http.ResponseWriter, r *http.Request) {
+func (s *DiskServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	stat := make(map[string]interface{})
 	stat["cpu"] = runtime.NumCPU()
 	stat["goroutine"] = runtime.NumGoroutine()
@@ -118,11 +122,12 @@ func (d *DiskServer)PostHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Etag", etag)
 
 	if err := writeJson(w, r, httpStatus, ret); err != nil {
-		glog.V(0).Infof("error writing JSON %s: %v", ret, err)
+		glog.V(0).Infof("error writing JSON %v: %v", ret, err)
 	}
 
 	return
 }
+<<<<<<< HEAD
 
 func (d *DiskServer)GetHandler(w http.ResponseWriter, r *http.Request) {
 	vid, fid, filename, ext, _ := parseURLPath(r.URL.Path)
@@ -284,3 +289,5 @@ func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+=======
+>>>>>>> develop_fengjie
