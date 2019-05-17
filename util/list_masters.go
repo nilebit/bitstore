@@ -1,10 +1,9 @@
-package operation
+package util
 
 import (
 	"encoding/json"
 
 	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/util"
 )
 
 type ClusterStatusResult struct {
@@ -14,7 +13,7 @@ type ClusterStatusResult struct {
 }
 
 func ListMasters(server string) (leader string, peers []string, err error) {
-	jsonBlob, err := util.Get("http://" + server + "/cluster/status")
+	jsonBlob, err := Get("http://" + server + "/cluster/status")
 	glog.V(2).Info("list masters result :", string(jsonBlob))
 	if err != nil {
 		return "", nil, err

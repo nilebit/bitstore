@@ -2,6 +2,7 @@ package diskopt
 
 import (
 	"fmt"
+
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
 	"github.com/nilebit/bitstore/diskopt/volume"
@@ -9,15 +10,15 @@ import (
 )
 
 type Disk struct {
-	Locations       	[]*Location
-	VolumeSizeLimit 	uint64
-	Ip                 	string
-	Port               	int
+	Locations       []*Location
+	VolumeSizeLimit uint64
+	Ip              string
+	Port            int
 }
 
 // NewDisk 新建磁盘
 func NewDisk(dirNames []string, maxVolumeCounts []int, ip string, port int) (v *Disk) {
-	v = &Disk{Ip:ip, Port:port}
+	v = &Disk{Ip: ip, Port: port}
 	v.Locations = make([]*Location, 0)
 	for i := 0; i < len(dirNames); i++ {
 		location := NewLocation(dirNames[i], maxVolumeCounts[i])

@@ -5,16 +5,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/diskopt/needle"
-	"github.com/nilebit/bitstore/diskopt/replicate"
-	"github.com/nilebit/bitstore/diskopt/ttl"
-	"github.com/nilebit/bitstore/util"
 	"os"
 	"path"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/diskopt/needle"
+	"github.com/nilebit/bitstore/diskopt/replicate"
+	"github.com/nilebit/bitstore/diskopt/ttl"
+	"github.com/nilebit/bitstore/pb/manage_server_pb"
+	"github.com/nilebit/bitstore/util"
 )
 
 type Volume struct {
@@ -22,7 +24,7 @@ type Volume struct {
 	dir        string
 	Collection string
 	dataFile   *os.File
-	nm         needle.Mapper
+	NM         needle.Mapper
 	ReadOnly   bool
 
 	SuperBlock
@@ -33,7 +35,6 @@ type Volume struct {
 	lastCompactIndexOffset uint64
 	lastCompactRevision    uint16
 }
-
 
 func NewVolume(dirname string, collection string, id util.VIDType,
 	replicaPlacement *replicate.Placement,
@@ -53,6 +54,10 @@ func VolumeFileName(collection string, dir string, id int) (fileName string) {
 		fileName = path.Join(dir, collection+"_"+idString)
 	}
 	return
+}
+
+func (v *Volume) FileName() (fileName string) {
+	return VolumeFileName(v.Collection, v.dir, int(v.Id))
 }
 
 func checkFile(filename string) (exists, canRead, canWrite bool, modTime time.Time, fileSize int64) {
@@ -152,7 +157,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 		}
 
 		glog.V(0).Infoln("loading index", fileName+".idx", "to memory readonly", v.ReadOnly)
-		if v.nm, e = needle.LoadCompactNeedleMap(indexFile); e != nil {
+		if v.NM, e = needle.LoadCompactNeedleMap(indexFile); e != nil {
 			glog.V(0).Infof("loading index %s to memory error: %v", fileName+".idx", e)
 		}
 
@@ -162,7 +167,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, preallocate i
 }
 
 func (v *Volume) ContentSize() uint64 {
-	return v.nm.ContentSize()
+	return v.NM.ContentSize()
 }
 
 type FileId struct {
@@ -191,7 +196,7 @@ func (v *Volume) isFileUnchanged(n *needle.Needle) bool {
 	if v.Ttl.String() != "" {
 		return false
 	}
-	nv, ok := v.nm.Get(n.Id)
+	nv, ok := v.NM.Get(n.Id)
 	if ok && nv.Offset > 0 {
 		oldNeedle := new(needle.Needle)
 		err := oldNeedle.ReadData(v.dataFile, int64(nv.Offset)*needle.PaddingSize, nv.Size, v.Version())
@@ -246,9 +251,9 @@ func (v *Volume) WriteNeedle(n *needle.Needle) (size uint32, isUnchanged bool, e
 		return
 	}
 
-	nv, ok := v.nm.Get(n.Id)
+	nv, ok := v.NM.Get(n.Id)
 	if !ok || int64(nv.Offset)*needle.PaddingSize < offset {
-		if err = v.nm.Put(n.Id, uint32(offset/needle.PaddingSize), n.Size); err != nil {
+		if err = v.NM.Put(n.Id, uint32(offset/needle.PaddingSize), n.Size); err != nil {
 			glog.V(4).Infof("failed to save in needle map %d: %v", n.Id, err)
 		}
 	}
@@ -258,14 +263,13 @@ func (v *Volume) WriteNeedle(n *needle.Needle) (size uint32, isUnchanged bool, e
 	return
 }
 
-
 func (v *Volume) NeedToReplicate() bool {
 	return v.ReplicaPlacement.GetCopyCount() > 1
 }
 
 // read fills in Needle content by looking up n.Id from NeedleMapper
 func (v *Volume) ReadNeedle(n *needle.Needle) (int, error) {
-	nv, ok := v.nm.Get(n.Id)
+	nv, ok := v.NM.Get(n.Id)
 	if !ok || nv.Offset == 0 {
 		return -1, errors.New("Not Found")
 	}
@@ -301,7 +305,7 @@ func (v *Volume) DeleteNeedle(n *needle.Needle) (uint32, error) {
 	}
 	v.dataFileAccessLock.Lock()
 	defer v.dataFileAccessLock.Unlock()
-	nv, ok := v.nm.Get(n.Id)
+	nv, ok := v.NM.Get(n.Id)
 	//fmt.Println("key", n.Id, "volume offset", nv.Offset, "data_size", n.Size, "cached size", nv.Size)
 	if ok && nv.Size != needle.TombstoneFileSize {
 		size := nv.Size
@@ -309,7 +313,7 @@ func (v *Volume) DeleteNeedle(n *needle.Needle) (uint32, error) {
 		if err != nil {
 			return size, err
 		}
-		if err := v.nm.Delete(n.Id, uint32(offset/needle.PaddingSize)); err != nil {
+		if err := v.NM.Delete(n.Id, uint32(offset/needle.PaddingSize)); err != nil {
 			return size, err
 		}
 		n.Data = nil
@@ -317,4 +321,94 @@ func (v *Volume) DeleteNeedle(n *needle.Needle) (uint32, error) {
 		return size, err
 	}
 	return 0, nil
+}
+
+func (v *Volume) FileStat() (datSize uint64, idxSize uint64, modTime time.Time) {
+	v.dataFileAccessLock.Lock()
+	defer v.dataFileAccessLock.Unlock()
+
+	if v.dataFile == nil {
+		return
+	}
+
+	stat, e := v.dataFile.Stat()
+	if e == nil {
+		return uint64(stat.Size()), v.NM.IndexFileSize(), stat.ModTime()
+	}
+	glog.V(0).Infof("Failed to read file size %s %v", v.dataFile.Name(), e)
+	return // -1 causes integer overflow and the volume to become unwritable.
+}
+
+func (v *Volume) ToVolumeInformationMessage() *manage_server_pb.VolumeInformationMessage {
+	size, _, _ := v.FileStat()
+	return &manage_server_pb.VolumeInformationMessage{
+		Id:               uint32(v.Id),
+		Size:             size,
+		Collection:       v.Collection,
+		FileCount:        uint64(v.NM.FileCount()),
+		DeleteCount:      uint64(v.NM.DeletedCount()),
+		DeletedByteCount: v.NM.DeletedSize(),
+		ReadOnly:         v.ReadOnly,
+		ReplicaPlacement: uint32(v.ReplicaPlacement.Byte()),
+		Version:          uint32(v.Version()),
+		Ttl:              v.Ttl.ToUint32(),
+	}
+}
+
+func (v *Volume) Expired(volumeSizeLimit uint64) bool {
+	if volumeSizeLimit == 0 {
+		//skip if we don't know size limit
+		return false
+	}
+	if v.ContentSize() == 0 {
+		return false
+	}
+	if v.Ttl == nil || v.Ttl.Minutes() == 0 {
+		return false
+	}
+	glog.V(1).Infof("now:%v lastModified:%v", time.Now().Unix(), v.lastModifiedTime)
+	livedMinutes := (time.Now().Unix() - int64(v.lastModifiedTime)) / 60
+	glog.V(1).Infof("ttl:%v lived:%v", v.Ttl, livedMinutes)
+	if int64(v.Ttl.Minutes()) < livedMinutes {
+		return true
+	}
+	return false
+}
+
+// wait either maxDelayMinutes or 10% of ttl minutes
+func (v *Volume) ExiredLongEnough(maxDelayMinutes uint32) bool {
+	if v.Ttl == nil || v.Ttl.Minutes() == 0 {
+		return false
+	}
+	removalDelay := v.Ttl.Minutes() / 10
+	if removalDelay > maxDelayMinutes {
+		removalDelay = maxDelayMinutes
+	}
+
+	if uint64(v.Ttl.Minutes()+removalDelay)*60+v.lastModifiedTime < uint64(time.Now().Unix()) {
+		return true
+	}
+	return false
+}
+
+// Close cleanly shuts down this volume
+func (v *Volume) Close() {
+	v.dataFileAccessLock.Lock()
+	defer v.dataFileAccessLock.Unlock()
+	v.NM.Close()
+	_ = v.dataFile.Close()
+}
+
+// Destroy removes everything related to this volume
+func (v *Volume) Destroy() (err error) {
+	if v.ReadOnly {
+		err = fmt.Errorf("%s is read-only", v.dataFile.Name())
+		return
+	}
+	v.Close()
+	os.Remove(v.FileName() + ".dat")
+	os.Remove(v.FileName() + ".idx")
+	os.Remove(v.FileName() + ".cpd")
+	os.Remove(v.FileName() + ".cpx")
+	return
 }

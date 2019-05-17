@@ -9,8 +9,12 @@ import (
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"github.com/nilebit/bitstore/diskopt"
-	"github.com/nilebit/bitstore/operation"
 	"github.com/nilebit/bitstore/pb/manage_server_pb"
+	"github.com/nilebit/bitstore/util"
+)
+
+const (
+	MAX_TTL_VOLUME_REMOVAL_DELAY = 10 // 10 minutes
 )
 
 type DiskNodeMapper interface {
@@ -30,7 +34,7 @@ type DiskServer struct {
 	FolderMaxLimits []int
 	Debug           *bool
 	Router          *mux.Router
-	Disks           *diskopt.Disk
+	Disk            *diskopt.Disk
 	CurrentLeader   string
 	ManageNode      []string
 	DiskNodeMapper
@@ -55,7 +59,7 @@ func (s *DiskServer) RegistRouter() {
 }
 
 func (s *DiskServer) CreateDiskOpt() {
-	s.Disks = diskopt.NewDisk(s.Folders, s.FolderMaxLimits, *s.Ip, *s.Port)
+	s.Disk = diskopt.NewDisk(s.Folders, s.FolderMaxLimits, *s.Ip, *s.Port)
 	return
 }
 
@@ -94,7 +98,7 @@ func (s *DiskServer) FindMaster() (leader string, err error) {
 	}
 	for _, m := range s.ManageNode {
 		glog.V(4).Infof("Listing masters on %s", m)
-		if leader, masters, e := operation.ListMasters(m); e == nil {
+		if leader, masters, e := util.ListMasters(m); e == nil {
 			if leader != "" {
 				s.ManageNode = append(masters, m)
 				s.MasterNode = leader
@@ -124,5 +128,38 @@ func (s *DiskServer) ResetMaster() {
 }
 
 func (s *DiskServer) CollectHeartbeat() *manage_server_pb.Heartbeat {
-	return nil
+	var volumeMessages []*manage_server_pb.VolumeInformationMessage
+	maxVolumeCount := 0
+	var maxFileKey uint64
+	for _, location := range s.Disk.Locations {
+		maxVolumeCount += location.MaxVolumeCount
+		location.Lock()
+		for _, v := range location.Volumes {
+			if maxFileKey < v.NM.MaxFileKey() {
+				maxFileKey = v.NM.MaxFileKey()
+			}
+			if !v.Expired(s.Disk.VolumeSizeLimit) {
+				volumeMessages = append(volumeMessages, v.ToVolumeInformationMessage())
+			} else {
+				if v.ExiredLongEnough(MAX_TTL_VOLUME_REMOVAL_DELAY) {
+					location.DeleteVolumeById(v.Id)
+					glog.V(0).Infoln("volume", v.Id, "is deleted.")
+				} else {
+					glog.V(0).Infoln("volume", v.Id, "is expired.")
+				}
+			}
+		}
+		location.Unlock()
+	}
+
+	return &manage_server_pb.Heartbeat{
+		Ip:             *s.Ip,
+		Port:           uint32(*s.Port),
+		MaxVolumeCount: uint32(maxVolumeCount),
+		MaxFileKey:     maxFileKey,
+		DataCenter:     *s.DataCenter,
+		Rack:           *s.Rack,
+		Volumes:        volumeMessages,
+	}
+
 }

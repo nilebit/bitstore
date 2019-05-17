@@ -5,10 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/diskopt/needle"
-	"github.com/nilebit/bitstore/security"
-	"github.com/nilebit/bitstore/util"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -21,10 +17,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/diskopt/needle"
+	"github.com/nilebit/bitstore/security"
+	"github.com/nilebit/bitstore/util"
 )
 
 type Location struct {
-	Url       string `json:"url,omitempty"`
+	Url string `json:"url,omitempty"`
 }
 
 type LookupResult struct {
@@ -32,7 +33,6 @@ type LookupResult struct {
 	Locations []Location `json:"locations,omitempty"`
 	Error     string     `json:"error,omitempty"`
 }
-
 
 type VidInfo struct {
 	Locations       []Location
@@ -46,7 +46,7 @@ type VidCache struct {
 
 var (
 	ErrorNotFound = errors.New("not found")
-	vc VidCache
+	vc            VidCache
 )
 
 func (vc *VidCache) Get(vid string) ([]Location, error) {
@@ -124,6 +124,7 @@ type RemoteResult struct {
 }
 
 type DistributedOperationResult map[string]error
+
 func (dr DistributedOperationResult) Error() error {
 	var errs []string
 	for k, v := range dr {
@@ -137,22 +138,22 @@ func (dr DistributedOperationResult) Error() error {
 	return errors.New(strings.Join(errs, "\n"))
 }
 
-func (s *DiskServer)ReplicatedWrite(masterNode string, volumeId util.VIDType, n *needle.Needle,
+func (s *DiskServer) ReplicatedWrite(masterNode string, volumeId util.VIDType, n *needle.Needle,
 	r *http.Request) (size uint32, isUnchanged bool, errorStatus error) {
 	// 检查JWT
 	jwt := security.GetJwt(r)
 
 	// 写入数据
-	size, isUnchanged, err := s.Disks.Write(volumeId, n)
+	size, isUnchanged, err := s.Disk.Write(volumeId, n)
 	if err != nil {
 		errorStatus = fmt.Errorf("failed to write to local disk: %v", err)
 		return
 	}
 
-	needToReplicate := !s.Disks.HasVolume(volumeId)
-	needToReplicate = needToReplicate || s.Disks.FindVolume(volumeId).NeedToReplicate()
+	needToReplicate := !s.Disk.HasVolume(volumeId)
+	needToReplicate = needToReplicate || s.Disk.FindVolume(volumeId).NeedToReplicate()
 	if !needToReplicate {
-		needToReplicate = s.Disks.FindVolume(volumeId).NeedToReplicate()
+		needToReplicate = s.Disk.FindVolume(volumeId).NeedToReplicate()
 	}
 
 	if !needToReplicate || r.FormValue("type") == "replicate" {
@@ -161,8 +162,8 @@ func (s *DiskServer)ReplicatedWrite(masterNode string, volumeId util.VIDType, n 
 	// 分布写入数据
 	if err = s.DistributedOperation(masterNode, volumeId,
 		func(location Location) error {
-			u := url.URL{Scheme: "http", Host: location.Url, Path: r.URL.Path,}
-			q := url.Values{"type": {"replicate"},}
+			u := url.URL{Scheme: "http", Host: location.Url, Path: r.URL.Path}
+			q := url.Values{"type": {"replicate"}}
 
 			if n.LastModified > 0 {
 				q.Set("ts", strconv.FormatUint(n.LastModified, 10))
@@ -192,8 +193,8 @@ func (s *DiskServer)ReplicatedWrite(masterNode string, volumeId util.VIDType, n 
 	return
 }
 
-func (s *DiskServer)DistributedOperation(masterNode string, volumeId util.VIDType, op func(location Location) error) error {
-	var d = s.Disks
+func (s *DiskServer) DistributedOperation(masterNode string, volumeId util.VIDType, op func(location Location) error) error {
+	var d = s.Disk
 	if lookupResult, lookupErr := Lookup(masterNode, volumeId.String()); lookupErr == nil {
 		length := 0
 		selfUrl := (d.Ip + ":" + strconv.Itoa(d.Port))
@@ -211,7 +212,7 @@ func (s *DiskServer)DistributedOperation(masterNode string, volumeId util.VIDTyp
 			result := <-results
 			ret[result.Host] = result.Error
 		}
-		if volume :=d.FindVolume(volumeId); volume != nil {
+		if volume := d.FindVolume(volumeId); volume != nil {
 			if length+1 < volume.ReplicaPlacement.GetCopyCount() {
 				return fmt.Errorf("replicating opetations [%d] is less than volume's replication copy count [%d]",
 					length+1, volume.ReplicaPlacement.GetCopyCount())
@@ -237,7 +238,7 @@ var (
 )
 
 func init() {
-	client = &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 1024,}}
+	client = &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 1024}}
 }
 
 func uploadContent(uploadUrl string, fillBufferFunction func(w io.Writer) error, filename string,
@@ -306,21 +307,21 @@ func uploadContent(uploadUrl string, fillBufferFunction func(w io.Writer) error,
 	return &ret, nil
 }
 
-func (d *DiskServer)ReplicatedDelete(masterNode string,
-	volumeId util.VIDType, n *needle.Needle,r *http.Request) (uint32, error) {
+func (d *DiskServer) ReplicatedDelete(masterNode string,
+	volumeId util.VIDType, n *needle.Needle, r *http.Request) (uint32, error) {
 
 	//check JWT
 	jwt := security.GetJwt(r)
 
-	ret, err := d.Disks.Delete(volumeId, n)
+	ret, err := d.Disk.Delete(volumeId, n)
 	if err != nil {
 		glog.V(0).Infoln("delete error:", err)
 		return ret, err
 	}
 
-	needToReplicate := !d.Disks.HasVolume(volumeId)
+	needToReplicate := !d.Disk.HasVolume(volumeId)
 	if !needToReplicate && ret > 0 {
-		needToReplicate = d.Disks.FindVolume(volumeId).NeedToReplicate()
+		needToReplicate = d.Disk.FindVolume(volumeId).NeedToReplicate()
 	}
 	if needToReplicate { //send to other replica locations
 		if r.FormValue("type") != "replicate" {

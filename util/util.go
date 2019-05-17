@@ -72,13 +72,6 @@ func (vid *VIDType) Next() VIDType {
 	return false, false
 }
 
-func NormalizeUrl(url string) string {
-	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
-		return url
-	}
-	return "http://" + url
-}
-
 func UnGzipData(input []byte) ([]byte, error) {
 	buf := bytes.NewBuffer(input)
 	r, _ := gzip.NewReader(buf)

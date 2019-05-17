@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/diskopt/needle"
-	"github.com/nilebit/bitstore/util"
 	"net/http"
 	"net/url"
 	"path"
@@ -83,7 +80,7 @@ func parseURLPath(path string) (vid, fid, filename, ext string, isVIdOnly bool) 
 	return
 }
 
-func (d *DiskServer)PostHandler(w http.ResponseWriter, r *http.Request) {
+func (d *DiskServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 	if e := r.ParseForm(); e != nil {
 		glog.V(0).Infoln("form parse error:", e)
 		writeJsonError(w, r, http.StatusBadRequest, e)
@@ -127,9 +124,8 @@ func (d *DiskServer)PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	return
 }
-<<<<<<< HEAD
 
-func (d *DiskServer)GetHandler(w http.ResponseWriter, r *http.Request) {
+func (d *DiskServer) GetHandler(w http.ResponseWriter, r *http.Request) {
 	vid, fid, filename, ext, _ := parseURLPath(r.URL.Path)
 	volumeId, err := util.NewVolumeId(vid)
 	if err != nil {
@@ -146,7 +142,7 @@ func (d *DiskServer)GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	glog.V(4).Infoln("volume", volumeId, "reading", n)
-	if !d.Disks.HasVolume(volumeId) {
+	if !d.Disk.HasVolume(volumeId) {
 		lookupResult, err := Lookup(d.CurrentLeader, volumeId.String())
 		glog.V(2).Infoln("volume", volumeId, "found on", lookupResult, "error", err)
 		if err == nil && len(lookupResult.Locations) > 0 {
@@ -167,7 +163,7 @@ func (d *DiskServer)GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cookie := n.Cookie
-	count, e := d.Disks.ReadVolumeNeedle(volumeId, n)
+	count, e := d.Disk.ReadVolumeNeedle(volumeId, n)
 	glog.V(4).Infoln("read bytes", count, "error", e)
 	if e != nil || count < 0 {
 		glog.V(0).Infoln("read error:", e, r.URL.Path)
@@ -250,7 +246,7 @@ func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	cookie := n.Cookie
 
-	_, ok := d.Disks.ReadVolumeNeedle(volumeId, n)
+	_, ok := d.Disk.ReadVolumeNeedle(volumeId, n)
 	if ok != nil {
 		m := make(map[string]uint32)
 		m["size"] = 0
@@ -289,5 +285,3 @@ func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-=======
->>>>>>> develop_fengjie

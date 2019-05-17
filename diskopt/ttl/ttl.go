@@ -117,3 +117,9 @@ func (t *TTL) Minutes() uint32 {
 	}
 	return 0
 }
+
+func (t *TTL) ToUint32() (output uint32) {
+	output = uint32(t.count) << 8
+	output += uint32(t.unit)
+	return output
+}
