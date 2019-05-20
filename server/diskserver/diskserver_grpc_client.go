@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/pb/manage_server_pb"
+	"github.com/nilebit/bitstore/pb"
 	"github.com/nilebit/bitstore/util"
 	"google.golang.org/grpc"
 )
@@ -44,7 +44,7 @@ func (s *DiskServer) doHeartbeat(ctx context.Context, masterNode string, grpcDia
 	}
 	defer grpcConection.Close()
 
-	client := manage_server_pb.NewBitstoreClient(grpcConection)
+	client := pb.NewSeaweedClient(grpcConection)
 	stream, err := client.SendHeartbeat(ctx)
 	if err != nil {
 		glog.V(0).Infof("SendHeartbeat to %s: %v", masterNode, err)

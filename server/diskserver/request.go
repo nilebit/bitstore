@@ -29,6 +29,9 @@ type UploadResult struct {
 
 func (s *DiskServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	stat := make(map[string]interface{})
+	stat["Version"] = util.VERSION
+	stat["Volumes"] = s.Disk.Status()
+
 	stat["cpu"] = runtime.NumCPU()
 	stat["goroutine"] = runtime.NumGoroutine()
 	stat["cgocall"] = runtime.NumCgoCall()
@@ -37,14 +40,18 @@ func (s *DiskServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	stat["gc"] = gcStat.NumGC
 	stat["pausetotal"] = gcStat.PauseTotal.Nanoseconds()
 
-	bytes, err := json.Marshal(stat)
-	if err != nil {
-		bytes = []byte("json marshal error")
+	if err := writeJson(w, r, http.StatusOK, stat); err != nil {
+		glog.V(0).Infof("error writing JSON %v: %v", stat, err)
 	}
-	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(bytes)
-	return
+
+	// bytes, err := json.Marshal(stat)
+	// if err != nil {
+	// 	bytes = []byte("json marshal error")
+	// }
+	// w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	// w.WriteHeader(http.StatusOK)
+	// _, err = w.Write(bytes)
+	// return
 }
 
 func parseURLPath(path string) (vid, fid, filename, ext string, isVIdOnly bool) {
@@ -283,5 +290,32 @@ func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		writeJsonError(w, r, http.StatusInternalServerError, fmt.Errorf("Deletion Failed: %v", err))
 	}
+}
 
+func (d *DiskServer) AssignVolumeHandler(w http.ResponseWriter, r *http.Request) {
+	var err error
+	preallocate := int64(0)
+	preallocateStr := r.FormValue("preallocate")
+
+	if preallocateStr != "" {
+		preallocate, err = strconv.ParseInt(preallocateStr, 10, 64)
+		if err != nil {
+			glog.V(0).Infof("ignoring invalid int64 value for preallocate = %s \n", preallocateStr)
+		}
+	}
+	err = d.Disk.AddVolume(
+		r.FormValue("volume"),
+		r.FormValue("collection"),
+		r.FormValue("replication"),
+		r.FormValue("ttl"),
+		preallocate,
+	)
+
+	if err == nil {
+		writeJsonQuiet(w, r, http.StatusAccepted, map[string]string{"error": ""})
+	} else {
+		writeJsonError(w, r, http.StatusNotAcceptable, err)
+	}
+	glog.V(2).Infof("assign volume = %s, collection = %s , replication = %s, error = %v \n",
+		r.FormValue("volume"), r.FormValue("collection"), r.FormValue("replication"), err)
 }

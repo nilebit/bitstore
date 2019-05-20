@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -13,6 +12,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 func writeJson(w http.ResponseWriter, r *http.Request, httpStatus int, obj interface{}) (err error) {
@@ -27,7 +28,7 @@ func writeJson(w http.ResponseWriter, r *http.Request, httpStatus int, obj inter
 	}
 	callback := r.FormValue("callback")
 	if callback == "" {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 		w.WriteHeader(httpStatus)
 		_, err = w.Write(bytes)
 	} else {
@@ -53,6 +54,12 @@ func writeJsonError(w http.ResponseWriter, r *http.Request, httpStatus int, err 
 	m["error"] = err.Error()
 	if err := writeJson(w, r, httpStatus, m); err != nil {
 		glog.V(0).Infof("error writing JSON %s: %v", m, err)
+	}
+}
+
+func writeJsonQuiet(w http.ResponseWriter, r *http.Request, httpStatus int, obj interface{}) {
+	if err := writeJson(w, r, httpStatus, obj); err != nil {
+		glog.V(0).Infof("error writing JSON %s: %v", obj, err)
 	}
 }
 

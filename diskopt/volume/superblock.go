@@ -2,12 +2,13 @@ package volume
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/replicate"
 	"github.com/nilebit/bitstore/diskopt/ttl"
 	"github.com/nilebit/bitstore/diskopt/version"
 	"github.com/nilebit/bitstore/util"
-	"os"
 )
 
 const (
@@ -28,7 +29,6 @@ type SuperBlock struct {
 	Ttl              *ttl.TTL
 	CompactRevision  uint16
 }
-
 
 func (s *SuperBlock) Version() version.Version {
 	return s.version
@@ -68,7 +68,7 @@ func (v *Volume) readSuperBlock() (err error) {
 func (v *Volume) maybeWriteSuperBlock() error {
 	stat, e := v.dataFile.Stat()
 	if e != nil {
-		glog.V(0).Infof("failed to stat datafile %s: %v", v.dataFile, e)
+		glog.V(0).Infof("failed to stat datafile %v: %v", v.dataFile, e)
 		return e
 	}
 	if stat.Size() == 0 {

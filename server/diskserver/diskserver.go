@@ -9,7 +9,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"github.com/nilebit/bitstore/diskopt"
-	"github.com/nilebit/bitstore/pb/manage_server_pb"
+	"github.com/nilebit/bitstore/pb"
 	"github.com/nilebit/bitstore/util"
 )
 
@@ -50,6 +50,8 @@ func NewDiskServer() *DiskServer {
 func (s *DiskServer) RegistRouter() {
 	paramMux := mux.NewRouter().SkipClean(false)
 	apiRouter := paramMux.NewRoute().PathPrefix("/").Subrouter()
+	apiRouter.Methods("POST").Path("/admin/assign_volume").HandlerFunc(s.AssignVolumeHandler)
+
 	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.StatusHandler)
 	apiRouter.Methods("PUT", "POST").Path("/{object:.+}").HandlerFunc(s.PostHandler)
 	apiRouter.Methods("GET", "HEAD").Path("/{object:.+}").HandlerFunc(s.GetHandler)
@@ -66,7 +68,7 @@ func (s *DiskServer) CreateDiskOpt() {
 func (s *DiskServer) StartServer() bool {
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
 	glog.V(0).Infoln("Start a disk server ", "at", listeningAddress)
-	go s.heartbeat()
+	// go s.heartbeat()
 
 	if err := http.ListenAndServe(listeningAddress, s.Router); err != nil {
 		glog.Fatalf("service fail to serve: %v", err)
@@ -127,8 +129,8 @@ func (s *DiskServer) ResetMaster() {
 	}
 }
 
-func (s *DiskServer) CollectHeartbeat() *manage_server_pb.Heartbeat {
-	var volumeMessages []*manage_server_pb.VolumeInformationMessage
+func (s *DiskServer) CollectHeartbeat() *pb.Heartbeat {
+	var volumeMessages []*pb.VolumeInformationMessage
 	maxVolumeCount := 0
 	var maxFileKey uint64
 	for _, location := range s.Disk.Locations {
@@ -152,7 +154,7 @@ func (s *DiskServer) CollectHeartbeat() *manage_server_pb.Heartbeat {
 		location.Unlock()
 	}
 
-	return &manage_server_pb.Heartbeat{
+	return &pb.Heartbeat{
 		Ip:             *s.Ip,
 		Port:           uint32(*s.Port),
 		MaxVolumeCount: uint32(maxVolumeCount),
