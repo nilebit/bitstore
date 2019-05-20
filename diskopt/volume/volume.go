@@ -15,7 +15,7 @@ import (
 	"github.com/nilebit/bitstore/diskopt/needle"
 	"github.com/nilebit/bitstore/diskopt/replicate"
 	"github.com/nilebit/bitstore/diskopt/ttl"
-	"github.com/nilebit/bitstore/pb/manage_server_pb"
+	"github.com/nilebit/bitstore/pb"
 	"github.com/nilebit/bitstore/util"
 )
 
@@ -54,6 +54,11 @@ func VolumeFileName(collection string, dir string, id int) (fileName string) {
 		fileName = path.Join(dir, collection+"_"+idString)
 	}
 	return
+}
+
+func NewVolumeId(vid string) (util.VIDType, error) {
+	volumeId, err := strconv.ParseUint(vid, 10, 64)
+	return util.VIDType(volumeId), err
 }
 
 func (v *Volume) FileName() (fileName string) {
@@ -339,9 +344,9 @@ func (v *Volume) FileStat() (datSize uint64, idxSize uint64, modTime time.Time) 
 	return // -1 causes integer overflow and the volume to become unwritable.
 }
 
-func (v *Volume) ToVolumeInformationMessage() *manage_server_pb.VolumeInformationMessage {
+func (v *Volume) ToVolumeInformationMessage() *pb.VolumeInformationMessage {
 	size, _, _ := v.FileStat()
-	return &manage_server_pb.VolumeInformationMessage{
+	return &pb.VolumeInformationMessage{
 		Id:               uint32(v.Id),
 		Size:             size,
 		Collection:       v.Collection,

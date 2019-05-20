@@ -121,3 +121,17 @@ func (l *Location) DeleteVolumeById(vid util.VIDType) (e error) {
 	delete(l.Volumes, vid)
 	return
 }
+
+func (l *Location) VolumesLen() int {
+	l.RLock()
+	defer l.RUnlock()
+
+	return len(l.Volumes)
+}
+
+func (l *Location) SetVolume(vid util.VIDType, volume *volume.Volume) {
+	l.Lock()
+	defer l.Unlock()
+
+	l.Volumes[vid] = volume
+}

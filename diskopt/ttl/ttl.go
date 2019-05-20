@@ -25,6 +25,14 @@ func LoadFromBytes(input []byte) (t *TTL) {
 	return &TTL{count: input[0], unit: input[1]}
 }
 
+// read stored bytes to a ttl
+func LoadFromUint32(ttl uint32) (t *TTL) {
+	input := make([]byte, 2)
+	input[1] = byte(ttl)
+	input[0] = byte(ttl >> 8)
+	return LoadFromBytes(input)
+}
+
 // save stored bytes to an output with 2 bytes
 func (t *TTL) ToBytes(output []byte) {
 	output[0] = t.count

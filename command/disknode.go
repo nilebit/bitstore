@@ -49,6 +49,7 @@ func RunDN(md *Command, args []string) (ret bool) {
 	if len(dn.Folders) != len(dn.FolderMaxLimits) {
 		glog.Fatalf("%d directories by -dir, but only %d max is set by -max", len(dn.Folders), len(dn.FolderMaxLimits))
 	}
+
 	dn.RegistRouter()
 	dn.CreateDiskOpt()
 
