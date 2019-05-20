@@ -55,9 +55,7 @@ func (s *ManageServer) checkPeers() (address string, cleanedPeers []string)  {
 func (s *ManageServer) StartServer() bool {
 //	address, peers := s.checkPeers()
 
-	// 启动RPC服务
 
-	// 启动RAFT
 
 	return true
 }
