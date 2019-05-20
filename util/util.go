@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,8 @@ func (vid *VIDType) Next() VIDType {
 
 /*
 * Default more not to gzip since gzip can be done on client side.
- */func IsGzippableFileType(ext, mtype string) (shouldBeZipped, iAmSure bool) {
+ */
+func IsGzippableFileType(ext, mtype string) (shouldBeZipped, iAmSure bool) {
 
 	// text
 	if strings.HasPrefix(mtype, "text/") {
@@ -111,4 +113,21 @@ func Delete(url string, jwt security.EncodedJwt) error {
 		}
 	}
 	return errors.New(string(body))
+}
+
+
+func TestFolderWritable(folder string) (err error) {
+	fileInfo, err := os.Stat(folder)
+	if err != nil {
+		return err
+	}
+	if !fileInfo.IsDir() {
+		return errors.New("Not a valid folder!")
+	}
+	perm := fileInfo.Mode().Perm()
+	glog.V(0).Infoln("Folder", folder, "Permission:", perm)
+	if 0200&perm != 0 {
+		return nil
+	}
+	return errors.New("Not writable!")
 }

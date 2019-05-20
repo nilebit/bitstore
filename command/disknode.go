@@ -11,7 +11,7 @@ import (
 )
 
 var DNModule = &Command{
-	UsageLine: "disknode -port=8001",
+	UsageLine: "disk -port=8001",
 	Short:     "start a disk node server",
 	Long:      `start a disk node server to provide bitstore spaces`,
 }

@@ -66,7 +66,7 @@ type raftNode struct {
 // provided the proposal channel. All log entries are replayed over the
 // commit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
-func newRaftNode(id int, peers []string, join bool, metaDir string, getSnapshot func() ([]byte, error), proposeC <-chan string,
+func NewRaftNode(id int, peers []string, join bool, metaDir string, getSnapshot func() ([]byte, error), proposeC <-chan string,
 	confChangeC <-chan raftpb.ConfChange) (<-chan *string, <-chan error, *raftNode) {
 
 	commitC := make(chan *string)
