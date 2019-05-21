@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nilebit/bitstore/diskopt/volume"
-
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
 	"github.com/nilebit/bitstore/util"
@@ -44,9 +42,9 @@ func (s *DiskServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	debug.ReadGCStats(gcStat)
 	stat["gc"] = gcStat.NumGC
 	stat["pausetotal"] = gcStat.PauseTotal.Nanoseconds()
-
-	ctx.RespHttpStatus = http.StatusOK
 	ctx.RespBodyJson = stat
+	ctx.RespHttpStatus = http.StatusOK
+	writeResponse(w, ctx)
 }
 
 func parseURLPath(path string) (vid, fid, filename, ext string, isVIdOnly bool) {
@@ -83,6 +81,9 @@ func parseURLPath(path string) (vid, fid, filename, ext string, isVIdOnly bool) 
 }
 
 func (d *DiskServer) PostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
 	if e := r.ParseForm(); e != nil {
 		glog.V(0).Infoln("form parse error:", e)
 		writeJsonError(w, r, http.StatusBadRequest, e)
@@ -91,13 +92,19 @@ func (d *DiskServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 	vid, _, _, _, _ := parseURLPath(r.URL.Path)
 	volumeId, ve := util.NewVolumeId(vid)
 	if ve != nil {
-		glog.V(0).Infoln("NewVolumeId error:", ve)
-		writeJsonError(w, r, http.StatusBadRequest, ve)
+		// glog.V(0).Infoln("NewVolumeId error:", ve)
+		// writeJsonError(w, r, http.StatusBadRequest, ve)
+		ctx.Err = fmt.Errorf("NewVolumeId error: %s", ve.Error())
+		ctx.RespHttpStatus = http.StatusBadRequest
+		writeResponse(w, ctx)
 		return
 	}
 	needle, originalSize, ne := needle.NewNeedle(r)
 	if ne != nil {
-		writeJsonError(w, r, http.StatusBadRequest, ne)
+		// writeJsonError(w, r, http.StatusBadRequest, ne)
+		ctx.Err = ne
+		ctx.RespHttpStatus = http.StatusBadRequest
+		writeResponse(w, ctx)
 		return
 	}
 
@@ -120,26 +127,39 @@ func (d *DiskServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 	etag := needle.Etag()
 	w.Header().Set("Etag", etag)
 
-	if err := writeJson(w, r, httpStatus, ret); err != nil {
-		glog.V(0).Infof("error writing JSON %v: %v", ret, err)
-	}
+	ctx.RespBodyJson = ret
+	ctx.RespHttpStatus = httpStatus
+	writeResponse(w, ctx)
+
+	// if err := writeJson(w, r, httpStatus, ret); err != nil {
+	// 	glog.V(0).Infof("error writing JSON %v: %v", ret, err)
+	// }
 
 	return
 }
 
 func (d *DiskServer) GetHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
 	vid, fid, filename, ext, _ := parseURLPath(r.URL.Path)
 	volumeId, err := util.NewVolumeId(vid)
 	if err != nil {
-		glog.V(2).Infoln("parsing error:", err, r.URL.Path)
-		w.WriteHeader(http.StatusBadRequest)
+		// glog.V(2).Infoln("parsing error:", err, r.URL.Path)
+		// w.WriteHeader(http.StatusBadRequest)
+		ctx.Err = err
+		ctx.RespHttpStatus = http.StatusBadRequest
+		writeResponse(w, ctx)
 		return
 	}
 	n := new(needle.Needle)
 	err = n.ParsePath(fid)
 	if err != nil {
-		glog.V(2).Infoln("parsing fid error:", err, r.URL.Path)
-		w.WriteHeader(http.StatusBadRequest)
+		// glog.V(2).Infoln("parsing fid error:", err, r.URL.Path)
+		// w.WriteHeader(http.StatusBadRequest)
+		ctx.Err = err
+		ctx.RespHttpStatus = http.StatusBadRequest
+		writeResponse(w, ctx)
 		return
 	}
 
@@ -158,8 +178,11 @@ func (d *DiskServer) GetHandler(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
 
 		} else {
-			glog.V(2).Infoln("lookup error:", err, r.URL.Path)
-			w.WriteHeader(http.StatusNotFound)
+			// glog.V(2).Infoln("lookup error:", err, r.URL.Path)
+			// w.WriteHeader(http.StatusNotFound)
+			ctx.Err = err
+			ctx.RespHttpStatus = http.StatusNotFound
+			writeResponse(w, ctx)
 		}
 		return
 	}
@@ -168,14 +191,20 @@ func (d *DiskServer) GetHandler(w http.ResponseWriter, r *http.Request) {
 	count, e := d.Disk.ReadVolumeNeedle(volumeId, n)
 	glog.V(4).Infoln("read bytes", count, "error", e)
 	if e != nil || count < 0 {
-		glog.V(0).Infoln("read error:", e, r.URL.Path)
-		w.WriteHeader(http.StatusNotFound)
+		// glog.V(0).Infoln("read error:", e, r.URL.Path)
+		// w.WriteHeader(http.StatusNotFound)
+		ctx.Err = err
+		ctx.RespHttpStatus = http.StatusNotFound
+		writeResponse(w, ctx)
 		return
 	}
 	defer n.ReleaseMemory()
 	if n.Cookie != cookie {
-		glog.V(0).Infoln("request", r.URL.Path, "with unmaching cookie seen:", cookie, "expected:", n.Cookie, "from", r.RemoteAddr, "agent", r.UserAgent())
-		w.WriteHeader(http.StatusNotFound)
+		// glog.V(0).Infoln("request", r.URL.Path, "with unmaching cookie seen:", cookie, "expected:", n.Cookie, "from", r.RemoteAddr, "agent", r.UserAgent())
+		// w.WriteHeader(http.StatusNotFound)
+		ctx.Err = err
+		ctx.RespHttpStatus = http.StatusNotFound
+		writeResponse(w, ctx)
 		return
 	}
 	if n.LastModified != 0 {
@@ -183,7 +212,10 @@ func (d *DiskServer) GetHandler(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("If-Modified-Since") != "" {
 			if t, parseError := time.Parse(http.TimeFormat, r.Header.Get("If-Modified-Since")); parseError == nil {
 				if t.Unix() >= int64(n.LastModified) {
-					w.WriteHeader(http.StatusNotModified)
+					// w.WriteHeader(http.StatusNotModified)
+					ctx.Err = fmt.Errorf("lastModified time is not match")
+					ctx.RespHttpStatus = http.StatusNotModified
+					writeResponse(w, ctx)
 					return
 				}
 			}
@@ -191,7 +223,10 @@ func (d *DiskServer) GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	etag := n.Etag()
 	if inm := r.Header.Get("If-None-Match"); inm == etag {
-		w.WriteHeader(http.StatusNotModified)
+		// w.WriteHeader(http.StatusNotModified)
+		ctx.Err = fmt.Errorf("etag is same")
+		ctx.RespHttpStatus = http.StatusNotModified
+		writeResponse(w, ctx)
 		return
 	}
 	w.Header().Set("Etag", etag)
@@ -234,13 +269,17 @@ func (d *DiskServer) GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if e := writeResponseContent(filename, mtype, bytes.NewReader(n.Data), w, r); e != nil {
-		glog.V(2).Infoln("response write error:", e)
+		// glog.V(2).Infoln("response write error:", e)
+		ctx.Err = fmt.Errorf("response write error: %s", e.Error())
 	}
 
 	return
 }
 
 func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
 	n := new(needle.Needle)
 	vid, fid, _, _, _ := parseURLPath(r.URL.Path)
 	volumeId, _ := util.NewVolumeId(vid)
@@ -252,15 +291,21 @@ func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if ok != nil {
 		m := make(map[string]uint32)
 		m["size"] = 0
-		if err := writeJson(w, r, http.StatusNotFound, m); err != nil {
-			glog.V(0).Infof("error writing JSON %+v status %d: %v", m, http.StatusNotFound, err)
-		}
+		ctx.RespBodyJson = m
+		ctx.RespHttpStatus = http.StatusNotFound
+		writeResponse(w, ctx)
+		// if err := writeJson(w, r, http.StatusNotFound, m); err != nil {
+		// 	glog.V(0).Infof("error writing JSON %+v status %d: %v", m, http.StatusNotFound, err)
+		// }
 		return
 	}
 
 	if n.Cookie != cookie {
-		glog.V(0).Infoln("delete", r.URL.Path, "with unmaching cookie from ", r.RemoteAddr, "agent", r.UserAgent())
-		writeJsonError(w, r, http.StatusBadRequest, errors.New("File Random Cookie does not match."))
+		// glog.V(0).Infoln("delete", r.URL.Path, "with unmaching cookie from ", r.RemoteAddr, "agent", r.UserAgent())
+		// writeJsonError(w, r, http.StatusBadRequest, errors.New("File Random Cookie does not match."))
+		ctx.Err = errors.New("File Random Cookie does not match.")
+		ctx.RespHttpStatus = http.StatusBadRequest
+		writeResponse(w, ctx)
 		return
 	}
 
@@ -279,11 +324,17 @@ func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		m := make(map[string]int64)
 		m["size"] = count
-		if err := writeJson(w, r, http.StatusAccepted, m); err != nil {
-			glog.V(0).Infof("error writing JSON %+v status %d: %v", m, http.StatusNotFound, err)
-		}
+		ctx.RespBodyJson = m
+		ctx.RespHttpStatus = http.StatusAccepted
+		writeResponse(w, ctx)
+		// if err := writeJson(w, r, http.StatusAccepted, m); err != nil {
+		// 	glog.V(0).Infof("error writing JSON %+v status %d: %v", m, http.StatusNotFound, err)
+		// }
 	} else {
-		writeJsonError(w, r, http.StatusInternalServerError, fmt.Errorf("Deletion Failed: %v", err))
+		// writeJsonError(w, r, http.StatusInternalServerError, fmt.Errorf("Deletion Failed: %v", err))
+		ctx.Err = fmt.Errorf("Deletion Failed: %v", err)
+		ctx.RespHttpStatus = http.StatusInternalServerError
+		writeResponse(w, ctx)
 	}
 }
 
@@ -312,9 +363,11 @@ func (d *DiskServer) AssignVolumeHandler(w http.ResponseWriter, r *http.Request)
 	if err == nil {
 		ctx.RespBodyJson = map[string]string{"error": ""}
 		ctx.RespHttpStatus = http.StatusAccepted
+		writeResponse(w, ctx)
 	} else {
 		ctx.Err = err
 		ctx.RespHttpStatus = http.StatusNotAcceptable
+		writeResponse(w, ctx)
 	}
 	return
 }
@@ -327,13 +380,15 @@ func (d *DiskServer) VolumeDeleteHandler(w http.ResponseWriter, r *http.Request)
 	if volumeIdString == "" {
 		ctx.RespHttpStatus = http.StatusNotFound
 		ctx.Err = fmt.Errorf("Empty Volume Id: Need to pass in volume.")
+		writeResponse(w, ctx)
 		return
 	}
 
-	vid, err := volume.NewVolumeId(volumeIdString)
+	vid, err := util.NewVolumeId(volumeIdString)
 	if err != nil {
 		ctx.RespHttpStatus = http.StatusNotFound
 		ctx.Err = fmt.Errorf("Volume Id %s is not a valid unsigned integer, %s", volumeIdString, err.Error())
+		writeResponse(w, ctx)
 		return
 	}
 
@@ -341,10 +396,12 @@ func (d *DiskServer) VolumeDeleteHandler(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		ctx.RespHttpStatus = http.StatusInternalServerError
 		ctx.Err = err
+		writeResponse(w, ctx)
 		return
 	}
 	ctx.RespHttpStatus = http.StatusOK
 	ctx.RespBodyJson = "Volume deleted"
+	writeResponse(w, ctx)
 	return
 }
 
@@ -356,11 +413,13 @@ func (d *DiskServer) VacuumVolumeCheckHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		ctx.Err = err
 		ctx.RespHttpStatus = http.StatusInternalServerError
+		writeResponse(w, ctx)
 		return
 	}
 
 	ctx.RespBodyJson = map[string]interface{}{"error": "", "result": ret}
 	ctx.RespHttpStatus = http.StatusOK
+	writeResponse(w, ctx)
 }
 
 func (d *DiskServer) VacuumVolumeCompactHandler(w http.ResponseWriter, r *http.Request) {
@@ -371,11 +430,13 @@ func (d *DiskServer) VacuumVolumeCompactHandler(w http.ResponseWriter, r *http.R
 	if err != nil {
 		ctx.RespHttpStatus = http.StatusInternalServerError
 		ctx.Err = err
+		writeResponse(w, ctx)
 		return
 	}
 
 	ctx.RespHttpStatus = http.StatusOK
 	ctx.RespBodyJson = map[string]string{"error": ""}
+	writeResponse(w, ctx)
 }
 
 func (d *DiskServer) VacuumVolumeCommitHandler(w http.ResponseWriter, r *http.Request) {
@@ -386,9 +447,11 @@ func (d *DiskServer) VacuumVolumeCommitHandler(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		ctx.RespHttpStatus = http.StatusInternalServerError
 		ctx.Err = err
+		writeResponse(w, ctx)
 		return
 	}
 
 	ctx.RespHttpStatus = http.StatusOK
 	ctx.RespBodyJson = map[string]string{"error": ""}
+	writeResponse(w, ctx)
 }

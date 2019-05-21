@@ -2,7 +2,6 @@ package diskserver
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -23,14 +22,14 @@ type Context struct {
 	RemoteRealIP   string
 	Host           string
 	Start          time.Time
-	RespBodyType   string
-	RespBody       string
-	RespBodyJson   interface{}
 	ProcessTime    int64
 	FormValues     string
 	Request        *http.Request
 	RespHttpStatus int
 	Err            error
+	RespBodyType   string
+	RespBody       string
+	RespBodyJson   interface{}
 }
 
 // get hostname
@@ -69,11 +68,6 @@ func NewContext(r *http.Request) *Context {
 }
 
 func Summary(w http.ResponseWriter, ctx *Context) {
-	err := SendResponse(w, ctx)
-	if err != nil {
-		errLog := fmt.Errorf("%v. %s", ctx.Err, err.Error())
-		ctx.Err = errLog
-	}
 	Logger(ctx)
 }
 
@@ -85,15 +79,4 @@ func Logger(ctx *Context) {
 
 	glog.V(0).Infof(EndLogTemplate, ctx.Host, ctx.RemoteRealIP, ctx.Request.Method, ctx.Request.RequestURI, ctx.RespHttpStatus, time.Now().Format(TimeFormat),
 		ctx.ProcessTime, ctx.FormValues, string(data), ctx.Err)
-}
-
-func SendResponse(w http.ResponseWriter, ctx *Context) error {
-	if ctx.Err == nil {
-		if ctx.RespBodyType == RespBodyTypeJson {
-			return writeJsonQuiet(w, ctx.Request, ctx.RespHttpStatus, ctx.RespBodyJson)
-		}
-		return writeResponse(w, ctx.Request, ctx.RespHttpStatus, []byte(ctx.RespBody))
-	} else {
-		return writeJsonError(w, ctx.Request, ctx.RespHttpStatus, ctx.Err)
-	}
 }

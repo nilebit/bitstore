@@ -150,7 +150,7 @@ func (s *Disk) AddVolume(volumeListString string, collection string, replicaPlac
 		// judge whether volumeListString is Scope of vid
 		if strings.Index(range_string, "-") < 0 {
 			id_string := range_string
-			id, err := volume.NewVolumeId(id_string)
+			id, err := util.NewVolumeId(id_string)
 			if err != nil {
 				return fmt.Errorf("Volume Id %s is not a valid unsigned integer!", id_string)
 			}
@@ -188,7 +188,7 @@ func (s *Disk) DeleteVolume(vid util.VIDType) error {
 }
 
 func (s *Disk) CheckCompactVolume(volumeIdString string, garbageThresholdString string) (error, bool) {
-	vid, err := volume.NewVolumeId(volumeIdString)
+	vid, err := util.NewVolumeId(volumeIdString)
 	if err != nil {
 		return fmt.Errorf("Volume Id %s is not a valid unsigned integer", volumeIdString), false
 	}
@@ -207,7 +207,7 @@ func (s *Disk) CheckCompactVolume(volumeIdString string, garbageThresholdString 
 }
 
 func (s *Disk) CompactVolume(volumeIdString string) error {
-	vid, err := volume.NewVolumeId(volumeIdString)
+	vid, err := util.NewVolumeId(volumeIdString)
 	if err != nil {
 		return fmt.Errorf("Volume Id %s is not a valid unsigned integer", volumeIdString)
 	}
@@ -221,7 +221,7 @@ func (s *Disk) CompactVolume(volumeIdString string) error {
 }
 
 func (s *Disk) CommitCompactVolume(volumeIdString string) error {
-	vid, err := volume.NewVolumeId(volumeIdString)
+	vid, err := util.NewVolumeId(volumeIdString)
 	if err != nil {
 		return fmt.Errorf("Volume Id %s is not a valid unsigned integer", volumeIdString)
 	}

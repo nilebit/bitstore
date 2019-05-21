@@ -24,10 +24,10 @@ func writeJson(w http.ResponseWriter, r *http.Request, httpStatus int, obj inter
 	if err != nil {
 		return
 	}
-	return writeResponse(w, r, httpStatus, bytes)
+	return writeResponseBytes(w, r, httpStatus, bytes)
 }
 
-func writeResponse(w http.ResponseWriter, r *http.Request, httpStatus int, bytes []byte) (err error) {
+func writeResponseBytes(w http.ResponseWriter, r *http.Request, httpStatus int, bytes []byte) (err error) {
 	callback := r.FormValue("callback")
 	if callback == "" {
 		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
@@ -66,6 +66,23 @@ func writeJsonQuiet(w http.ResponseWriter, r *http.Request, httpStatus int, obj 
 		return errRsp
 	}
 	return nil
+}
+
+func writeResponse(w http.ResponseWriter, ctx *Context) {
+	var err error
+	if ctx.Err == nil {
+		if ctx.RespBodyType == RespBodyTypeJson {
+			err = writeJsonQuiet(w, ctx.Request, ctx.RespHttpStatus, ctx.RespBodyJson)
+		}
+		err = writeResponseBytes(w, ctx.Request, ctx.RespHttpStatus, []byte(ctx.RespBody))
+	} else {
+		err = writeJsonError(w, ctx.Request, ctx.RespHttpStatus, ctx.Err)
+	}
+
+	if err != nil {
+		errLog := fmt.Errorf("%v. %s", ctx.Err, err.Error())
+		ctx.Err = errLog
+	}
 }
 
 // httpRange specifies the byte range to be sent to the client.
