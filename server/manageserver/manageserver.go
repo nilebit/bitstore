@@ -74,8 +74,7 @@ func (s *ManageServer) StartServer() bool {
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
 
 		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(0x01, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
-		topo := topology.NewTopology(<-SnapshotterReady, proposeC, commitC, errorC)
-
+		topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
 	}()
 
 

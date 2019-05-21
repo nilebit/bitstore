@@ -96,12 +96,12 @@ func (dn *DataNode) GetRack() *Rack {
 	return dn.Parent().(*NodeImpl).value.(*Rack)
 }
 
-func (dn *DataNode) GetTopology() *TopoStore {
+func (dn *DataNode) GetTopology() *Topology {
 	p := dn.Parent()
 	for p.Parent() != nil {
 		p = p.Parent()
 	}
-	t := p.(*TopoStore)
+	t := p.(*Topology)
 	return t
 }
 
