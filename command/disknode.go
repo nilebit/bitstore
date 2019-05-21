@@ -16,7 +16,12 @@ var DNModule = &Command{
 	Long:      `start a disk node server to provide bitstore spaces`,
 }
 
-var dn = diskserver.NewDiskServer()
+var (
+	dn = diskserver.NewDiskServer()
+	Folders *string
+	ManageNode *string
+	FolderMaxLimits *string
+)
 
 func init() {
 	DNModule.Run = RunDN
@@ -27,16 +32,9 @@ func init() {
 	dn.DataCenter = DNModule.Flag.String("dataCenter", "", "current dss server's data center name")
 	dn.Rack = DNModule.Flag.String("rack", "", "current volume server's rack name")
 	dn.Debug = DNModule.Flag.Bool("debug", false, "open debug")
-	dn.ManageNode = strings.Split(*DNModule.Flag.String("manageNode", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]..."), ",")
-	dn.Folders = strings.Split(*DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]..."), ",")
-	var tempFolderMaxLimits = strings.Split(*DNModule.Flag.String("max", "7", "maximum numbers of File, count[,count]..."), ",")
-	for _, maxString := range tempFolderMaxLimits {
-		if max, e := strconv.Atoi(maxString); e == nil {
-			dn.FolderMaxLimits = append(dn.FolderMaxLimits, max)
-		} else {
-			glog.Fatalf("The max specified in -max not a valid number %s", maxString)
-		}
-	}
+	ManageNode = DNModule.Flag.String("manage", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]...")
+	Folders = DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]...")
+	FolderMaxLimits = DNModule.Flag.String("max", "7", "maximum numbers of File, count[,count]...")
 }
 
 func RunDN(md *Command, args []string) (ret bool) {
@@ -45,6 +43,17 @@ func RunDN(md *Command, args []string) (ret bool) {
 		*dn.MaxCpu = runtime.NumCPU()
 	}
 	runtime.GOMAXPROCS(*dn.MaxCpu)
+	dn.ManageNode = strings.Split(*ManageNode, ",")
+	dn.Folders = strings.Split(*Folders, ",")
+
+	var tempFolderMaxLimits = strings.Split(*FolderMaxLimits, ",")
+	for _, maxString := range tempFolderMaxLimits {
+		if max, e := strconv.Atoi(maxString); e == nil {
+			dn.FolderMaxLimits = append(dn.FolderMaxLimits, max)
+		} else {
+			glog.Fatalf("The max specified in -max not a valid number %s", maxString)
+		}
+	}
 
 	if len(dn.Folders) != len(dn.FolderMaxLimits) {
 		glog.Fatalf("%d directories by -dir, but only %d max is set by -max", len(dn.Folders), len(dn.FolderMaxLimits))

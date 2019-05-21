@@ -11,6 +11,7 @@ import (
 )
 
 type ManageServer struct {
+	ID						*int
 	Ip 						*string
 	Port                    *int
 	MetaFolder              *string
@@ -73,10 +74,9 @@ func (s *ManageServer) StartServer() bool {
 		// raft provides a commit stream for the proposals from the http api
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
 
-		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(0x01, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
+		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(*s.ID, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
 		topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
 	}()
-
 
 	return true
 }
