@@ -12,8 +12,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-
-	"github.com/golang/glog"
 )
 
 func writeJson(w http.ResponseWriter, r *http.Request, httpStatus int, obj interface{}) (err error) {
@@ -26,6 +24,10 @@ func writeJson(w http.ResponseWriter, r *http.Request, httpStatus int, obj inter
 	if err != nil {
 		return
 	}
+	return writeResponse(w, r, httpStatus, bytes)
+}
+
+func writeResponse(w http.ResponseWriter, r *http.Request, httpStatus int, bytes []byte) (err error) {
 	callback := r.FormValue("callback")
 	if callback == "" {
 		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
@@ -45,22 +47,25 @@ func writeJson(w http.ResponseWriter, r *http.Request, httpStatus int, obj inter
 			return
 		}
 	}
-
 	return
 }
 
-func writeJsonError(w http.ResponseWriter, r *http.Request, httpStatus int, err error) {
+func writeJsonError(w http.ResponseWriter, r *http.Request, httpStatus int, err error) error {
 	m := make(map[string]interface{})
 	m["error"] = err.Error()
 	if err := writeJson(w, r, httpStatus, m); err != nil {
-		glog.V(0).Infof("error writing JSON %s: %v", m, err)
+		errRsp := fmt.Errorf("error writing JSON %s: %v", m, err)
+		return errRsp
 	}
+	return nil
 }
 
-func writeJsonQuiet(w http.ResponseWriter, r *http.Request, httpStatus int, obj interface{}) {
+func writeJsonQuiet(w http.ResponseWriter, r *http.Request, httpStatus int, obj interface{}) error {
 	if err := writeJson(w, r, httpStatus, obj); err != nil {
-		glog.V(0).Infof("error writing JSON %s: %v", obj, err)
+		errRsp := fmt.Errorf("error writing JSON %s: %v", obj, err)
+		return errRsp
 	}
+	return nil
 }
 
 // httpRange specifies the byte range to be sent to the client.
