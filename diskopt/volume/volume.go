@@ -56,11 +56,6 @@ func VolumeFileName(collection string, dir string, id int) (fileName string) {
 	return
 }
 
-func NewVolumeId(vid string) (util.VIDType, error) {
-	volumeId, err := strconv.ParseUint(vid, 10, 64)
-	return util.VIDType(volumeId), err
-}
-
 func (v *Volume) FileName() (fileName string) {
 	return VolumeFileName(v.Collection, v.dir, int(v.Id))
 }

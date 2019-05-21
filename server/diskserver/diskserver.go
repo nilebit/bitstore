@@ -44,7 +44,7 @@ func (s *DiskServer) RegistRouter() {
 	paramMux := mux.NewRouter().SkipClean(false)
 	apiRouter := paramMux.NewRoute().PathPrefix("/").Subrouter()
 	apiRouter.Methods("POST").Path("/admin/assign_volume").HandlerFunc(s.AssignVolumeHandler)
-	apiRouter.Methods("POST", "PUT", "GET").Path("/admin/volume/delete").HandlerFunc(s.VolumeDeleteHandler)
+	apiRouter.Methods("POST", "PUT", "GET", "DELETE").Path("/admin/volume/delete").HandlerFunc(s.VolumeDeleteHandler)
 	apiRouter.Methods("POST").Path("/admin/vacuum/check").HandlerFunc(s.VacuumVolumeCheckHandler)
 	apiRouter.Methods("POST").Path("/admin/vacuum/compact").HandlerFunc(s.VacuumVolumeCompactHandler)
 	apiRouter.Methods("POST").Path("/admin/vacuum/commit").HandlerFunc(s.VacuumVolumeCommitHandler)
