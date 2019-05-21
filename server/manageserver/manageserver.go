@@ -3,6 +3,9 @@ package manageserver
 import (
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
+	"github.com/nilebit/bitstore/raftnode"
+	"github.com/nilebit/bitstore/raftnode/topology"
+	"go.etcd.io/etcd/raft/raftpb"
 	"strconv"
 	"strings"
 )
@@ -15,6 +18,7 @@ type ManageServer struct {
 	Peers					*string
 	MaxCpu					*int
 	Router          		*mux.Router
+	topos 					*topology.Topology
 }
 
 func NewManageServer() *ManageServer {
@@ -29,32 +33,50 @@ func (s *ManageServer) RegistRouter() {
 	s.Router = apiRouter
 }
 
-func (s *ManageServer) checkPeers() (address string, cleanedPeers []string)  {
-	address = *s.Ip + ":" + strconv.Itoa(*s.Port)
-	if *s.Peers != "" {
-		cleanedPeers = strings.Split(*s.Peers, ",")
-	}
+func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
+	address := *s.Ip + ":" + strconv.Itoa(*s.Port + 10000)
+	peerCount := 0
 	hasSelf := false
-	for _, peer := range cleanedPeers {
-		if peer == address {
-			hasSelf = true
-			break
+	if *s.Peers != "" {
+		tempPeers := strings.Split(*s.Peers, ",")
+		for _, peer := range tempPeers {
+			ipPort := strings.Split(peer, ":")
+			port, _ := strconv.Atoi(ipPort[1])
+			newAddress := ipPort[0] + ":" + strconv.Itoa(port+10000)
+			if address == newAddress {
+				hasSelf = true
+			}
+			cleanedPeers = append(cleanedPeers, newAddress)
+			peerCount++
 		}
 	}
 
-	peerCount := len(cleanedPeers)
-	if !hasSelf {
-		peerCount += 1
+	if hasSelf == false {
+		cleanedPeers = append(cleanedPeers, address)
+		peerCount++
 	}
+
 	if peerCount % 2 == 0 {
-		glog.Fatalf("Only odd number of masters are supported!")
+		glog.Fatalf("Only odd number of manage are supported!")
 	}
 	return
 }
 
 func (s *ManageServer) StartServer() bool {
-//	address, peers := s.checkPeers()
+	peers := s.checkPeers()
+	// raft server
+	go func() {
+		proposeC := make(chan string)
+		defer close(proposeC)
+		confChangeC := make(chan raftpb.ConfChange)
+		defer close(confChangeC)
+		// raft provides a commit stream for the proposals from the http api
+		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
 
+		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(0x01, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
+		topo := topology.NewTopology(<-SnapshotterReady, proposeC, commitC, errorC)
+
+	}()
 
 
 	return true

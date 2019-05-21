@@ -1,52 +1,57 @@
-package raftnode
+package topology
 
 import (
 	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"go.etcd.io/etcd/etcdserver/api/snap"
 	"log"
 	"sync"
 )
 
-// a key-value store backed by raft
-type kvstore struct {
+type Topology struct {
 	proposeC    chan<- string // channel for proposing updates
 	mu          sync.RWMutex
-	kvStore     map[string]string // current committed key-value pairs
 	snapshotter *snap.Snapshotter
+	NodeImpl
+	collectionMap *ConcurrentReadMap
+	chanFullVolumes chan VolumeInfo
+	volumeSizeLimit uint64
 }
 
-type kv struct {
-	Key string
-	Val string
-}
-
-func newKVStore(snapshotter *snap.Snapshotter, proposeC chan<- string, commitC <-chan *string, errorC <-chan error) *kvstore {
-	s := &kvstore{proposeC: proposeC, kvStore: make(map[string]string), snapshotter: snapshotter}
+func NewTopology(volumeSizeLimit uint64,
+	snapshotter *snap.Snapshotter, proposeC chan<- string, commitC <-chan *string, errorC <-chan error) *Topology {
+	t := &Topology{proposeC: proposeC, snapshotter: snapshotter}
+	t.collectionMap = NewConcurrentReadMap()
+	t.id = NodeId("topo")
+	t.volumeSizeLimit = volumeSizeLimit
+	t.NodeImpl.value = t
+	t.children = make(map[NodeId]Node)
+	t.chanFullVolumes = make(chan VolumeInfo)
 	// replay log into key-value map
-	s.readCommits(commitC, errorC)
+	t.readCommits(commitC, errorC)
 	// read commits from raft into kvStore map until error
-	go s.readCommits(commitC, errorC)
-	return s
+	go t.readCommits(commitC, errorC)
+	return t
 }
 
-func (s *kvstore) Lookup(key string) (string, bool) {
+func (s *Topology) Lookup(key string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	v, ok := s.kvStore[key]
-	return v, ok
+
+	return "", true
 }
 
-func (s *kvstore) Propose(k string, v string) {
+func (s *Topology) Propose(k string, v string) {
 	var buf bytes.Buffer
+	/*
 	if err := gob.NewEncoder(&buf).Encode(kv{k, v}); err != nil {
 		log.Fatal(err)
 	}
+	*/
 	s.proposeC <- buf.String()
 }
 
-func (s *kvstore) readCommits(commitC <-chan *string, errorC <-chan error) {
+func (s *Topology) readCommits(commitC <-chan *string, errorC <-chan error) {
 	for data := range commitC {
 		if data == nil {
 			// done replaying log; new data incoming
@@ -65,13 +70,17 @@ func (s *kvstore) readCommits(commitC <-chan *string, errorC <-chan error) {
 			continue
 		}
 
-		var dataKv kv
+		// TODO
+		/*
 		dec := gob.NewDecoder(bytes.NewBufferString(*data))
 		if err := dec.Decode(&dataKv); err != nil {
 			log.Fatalf("raftexample: could not decode message (%v)", err)
 		}
+		*/
+
 		s.mu.Lock()
-		s.kvStore[dataKv.Key] = dataKv.Val
+
+		// TODO
 		s.mu.Unlock()
 	}
 	if err, ok := <-errorC; ok {
@@ -79,19 +88,19 @@ func (s *kvstore) readCommits(commitC <-chan *string, errorC <-chan error) {
 	}
 }
 
-func (s *kvstore) getSnapshot() ([]byte, error) {
+func (s *Topology) GetSnapshot() ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return json.Marshal(s.kvStore)
+	return json.Marshal(s.collectionMap)
 }
 
-func (s *kvstore) recoverFromSnapshot(snapshot []byte) error {
+func (s *Topology) recoverFromSnapshot(snapshot []byte) error {
 	var store map[string]string
 	if err := json.Unmarshal(snapshot, &store); err != nil {
 		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.kvStore = store
+	// TODO
 	return nil
 }

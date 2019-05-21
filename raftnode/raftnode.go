@@ -67,7 +67,7 @@ type raftNode struct {
 // commit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
 func NewRaftNode(id int, peers []string, join bool, metaDir string, getSnapshot func() ([]byte, error), proposeC <-chan string,
-	confChangeC <-chan raftpb.ConfChange) (<-chan *string, <-chan error, *raftNode) {
+	confChangeC <-chan raftpb.ConfChange) (<-chan *string, <-chan error, <-chan *snap.Snapshotter) {
 
 	commitC := make(chan *string)
 	errorC := make(chan error)
@@ -95,7 +95,7 @@ func NewRaftNode(id int, peers []string, join bool, metaDir string, getSnapshot 
 	}
 
 	go rc.startRaft()
-	return commitC, errorC, rc
+	return commitC, errorC,  rc.snapshotterReady
 }
 
 func FileExist(name string) bool {
