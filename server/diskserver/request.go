@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nilebit/bitstore/diskopt/volume"
+
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/needle"
 	"github.com/nilebit/bitstore/util"
@@ -28,6 +30,9 @@ type UploadResult struct {
 }
 
 func (s *DiskServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
 	stat := make(map[string]interface{})
 	stat["Version"] = util.VERSION
 	stat["Volumes"] = s.Disk.Status()
@@ -40,18 +45,8 @@ func (s *DiskServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	stat["gc"] = gcStat.NumGC
 	stat["pausetotal"] = gcStat.PauseTotal.Nanoseconds()
 
-	if err := writeJson(w, r, http.StatusOK, stat); err != nil {
-		glog.V(0).Infof("error writing JSON %v: %v", stat, err)
-	}
-
-	// bytes, err := json.Marshal(stat)
-	// if err != nil {
-	// 	bytes = []byte("json marshal error")
-	// }
-	// w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	// w.WriteHeader(http.StatusOK)
-	// _, err = w.Write(bytes)
-	// return
+	ctx.RespHttpStatus = http.StatusOK
+	ctx.RespBodyJson = stat
 }
 
 func parseURLPath(path string) (vid, fid, filename, ext string, isVIdOnly bool) {
@@ -293,6 +288,9 @@ func (d *DiskServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DiskServer) AssignVolumeHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
 	var err error
 	preallocate := int64(0)
 	preallocateStr := r.FormValue("preallocate")
@@ -312,10 +310,85 @@ func (d *DiskServer) AssignVolumeHandler(w http.ResponseWriter, r *http.Request)
 	)
 
 	if err == nil {
-		writeJsonQuiet(w, r, http.StatusAccepted, map[string]string{"error": ""})
+		ctx.RespBodyJson = map[string]string{"error": ""}
+		ctx.RespHttpStatus = http.StatusAccepted
 	} else {
-		writeJsonError(w, r, http.StatusNotAcceptable, err)
+		ctx.Err = err
+		ctx.RespHttpStatus = http.StatusNotAcceptable
 	}
-	glog.V(2).Infof("assign volume = %s, collection = %s , replication = %s, error = %v \n",
-		r.FormValue("volume"), r.FormValue("collection"), r.FormValue("replication"), err)
+	return
+}
+
+func (d *DiskServer) VolumeDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
+	volumeIdString := r.FormValue("volume")
+	if volumeIdString == "" {
+		ctx.RespHttpStatus = http.StatusNotFound
+		ctx.Err = fmt.Errorf("Empty Volume Id: Need to pass in volume.")
+		return
+	}
+
+	vid, err := volume.NewVolumeId(volumeIdString)
+	if err != nil {
+		ctx.RespHttpStatus = http.StatusNotFound
+		ctx.Err = fmt.Errorf("Volume Id %s is not a valid unsigned integer, %s", volumeIdString, err.Error())
+		return
+	}
+
+	err = d.Disk.DeleteVolume(vid)
+	if err != nil {
+		ctx.RespHttpStatus = http.StatusInternalServerError
+		ctx.Err = err
+		return
+	}
+	ctx.RespHttpStatus = http.StatusOK
+	ctx.RespBodyJson = "Volume deleted"
+	return
+}
+
+func (d *DiskServer) VacuumVolumeCheckHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
+	err, ret := d.Disk.CheckCompactVolume(r.FormValue("volume"), r.FormValue("garbageThreshold"))
+	if err != nil {
+		ctx.Err = err
+		ctx.RespHttpStatus = http.StatusInternalServerError
+		return
+	}
+
+	ctx.RespBodyJson = map[string]interface{}{"error": "", "result": ret}
+	ctx.RespHttpStatus = http.StatusOK
+}
+
+func (d *DiskServer) VacuumVolumeCompactHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
+	err := d.Disk.CompactVolume(r.FormValue("volume"))
+	if err != nil {
+		ctx.RespHttpStatus = http.StatusInternalServerError
+		ctx.Err = err
+		return
+	}
+
+	ctx.RespHttpStatus = http.StatusOK
+	ctx.RespBodyJson = map[string]string{"error": ""}
+}
+
+func (d *DiskServer) VacuumVolumeCommitHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := NewContext(r)
+	defer Summary(w, ctx)
+
+	err := d.Disk.CommitCompactVolume(r.FormValue("volume"))
+	if err != nil {
+		ctx.RespHttpStatus = http.StatusInternalServerError
+		ctx.Err = err
+		return
+	}
+
+	ctx.RespHttpStatus = http.StatusOK
+	ctx.RespBodyJson = map[string]string{"error": ""}
 }

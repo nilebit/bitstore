@@ -417,3 +417,20 @@ func (v *Volume) Destroy() (err error) {
 	os.Remove(v.FileName() + ".cpx")
 	return
 }
+
+func (v *Volume) GarbageLevel() float64 {
+	if v.ContentSize() == 0 {
+		return 0
+	}
+	return float64(v.NM.DeletedSize()) / float64(v.ContentSize())
+}
+
+//TODO
+func (v *Volume) Compact() error {
+	return nil
+}
+
+//TODO
+func (v *Volume) CommitCompact() error {
+	return nil
+}

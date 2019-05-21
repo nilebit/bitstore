@@ -33,8 +33,8 @@ func NewDisk(dirNames []string, maxVolumeCounts []int, ip string, port int) (v *
 	return
 }
 
-func (d *Disk) FindVolume(vid util.VIDType) *volume.Volume {
-	for _, location := range d.Locations {
+func (s *Disk) FindVolume(vid util.VIDType) *volume.Volume {
+	for _, location := range s.Locations {
 		if v, found := location.FindVolume(vid); found {
 			return v
 		}
@@ -42,8 +42,8 @@ func (d *Disk) FindVolume(vid util.VIDType) *volume.Volume {
 	return nil
 }
 
-func (d *Disk) Write(i util.VIDType, n *needle.Needle) (size uint32, isUnchanged bool, err error) {
-	if v := d.FindVolume(i); v != nil {
+func (s *Disk) Write(i util.VIDType, n *needle.Needle) (size uint32, isUnchanged bool, err error) {
+	if v := s.FindVolume(i); v != nil {
 		if v.ReadOnly {
 			err = fmt.Errorf("Volume %d is read only", i)
 			return
@@ -52,7 +52,7 @@ func (d *Disk) Write(i util.VIDType, n *needle.Needle) (size uint32, isUnchanged
 		if needle.MaxPossibleVolumeSize >= v.ContentSize()+uint64(size) {
 			size, isUnchanged, err = v.WriteNeedle(n)
 		} else {
-			err = fmt.Errorf("Volume Size Limit %d Exceeded! Current size is %d", d.VolumeSizeLimit, v.ContentSize())
+			err = fmt.Errorf("Volume Size Limit %d Exceeded! Current size is %d", s.VolumeSizeLimit, v.ContentSize())
 		}
 		return
 	}
@@ -61,13 +61,13 @@ func (d *Disk) Write(i util.VIDType, n *needle.Needle) (size uint32, isUnchanged
 	return
 }
 
-func (d *Disk) HasVolume(i util.VIDType) bool {
-	v := d.FindVolume(i)
+func (s *Disk) HasVolume(i util.VIDType) bool {
+	v := s.FindVolume(i)
 	return v != nil
 }
 
-func (d *Disk) ReadVolumeNeedle(i util.VIDType, n *needle.Needle) (int, error) {
-	if v := d.FindVolume(i); v != nil {
+func (s *Disk) ReadVolumeNeedle(i util.VIDType, n *needle.Needle) (int, error) {
+	if v := s.FindVolume(i); v != nil {
 		return v.ReadNeedle(n)
 	}
 	return 0, fmt.Errorf("Volume %d not found!", i)
@@ -176,4 +176,60 @@ func (s *Disk) AddVolume(volumeListString string, collection string, replicaPlac
 		}
 	}
 	return
+}
+
+func (s *Disk) DeleteVolume(vid util.VIDType) error {
+	for _, location := range s.Locations {
+		if _, found := location.FindVolume(vid); found {
+			return location.DeleteVolumeById(vid)
+		}
+	}
+	return nil
+}
+
+func (s *Disk) CheckCompactVolume(volumeIdString string, garbageThresholdString string) (error, bool) {
+	vid, err := volume.NewVolumeId(volumeIdString)
+	if err != nil {
+		return fmt.Errorf("Volume Id %s is not a valid unsigned integer", volumeIdString), false
+	}
+
+	garbageThreshold, e := strconv.ParseFloat(garbageThresholdString, 32)
+	if e != nil {
+		return fmt.Errorf("garbageThreshold %s is not a valid float number", garbageThresholdString), false
+	}
+
+	v := s.FindVolume(vid)
+	if v == nil {
+		return fmt.Errorf("volume id %d is not found during check compact", vid), false
+	}
+	glog.V(3).Infoln(vid, "garbage level is", v.GarbageLevel())
+	return nil, garbageThreshold < v.GarbageLevel()
+}
+
+func (s *Disk) CompactVolume(volumeIdString string) error {
+	vid, err := volume.NewVolumeId(volumeIdString)
+	if err != nil {
+		return fmt.Errorf("Volume Id %s is not a valid unsigned integer", volumeIdString)
+	}
+
+	v := s.FindVolume(vid)
+	if v == nil {
+		return fmt.Errorf("volume id %d is not found during compact", vid)
+	}
+
+	return v.Compact()
+}
+
+func (s *Disk) CommitCompactVolume(volumeIdString string) error {
+	vid, err := volume.NewVolumeId(volumeIdString)
+	if err != nil {
+		return fmt.Errorf("Volume Id %s is not a valid unsigned integer", volumeIdString)
+	}
+
+	v := s.FindVolume(vid)
+	if v == nil {
+		return fmt.Errorf("volume id %d is not found during commit compact", vid)
+	}
+
+	return v.CommitCompact()
 }
