@@ -6,6 +6,7 @@ import (
 	"github.com/nilebit/bitstore/raftnode"
 	"github.com/nilebit/bitstore/raftnode/topology"
 	"go.etcd.io/etcd/raft/raftpb"
+	"net/http"
 	"strconv"
 	"strings"
 )
@@ -64,8 +65,10 @@ func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
 }
 
 func (s *ManageServer) StartServer() bool {
+
 	peers := s.checkPeers()
 	// raft server
+
 	go func() {
 		proposeC := make(chan string)
 		defer close(proposeC)
@@ -75,8 +78,20 @@ func (s *ManageServer) StartServer() bool {
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
 
 		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(*s.ID, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
-		topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
+		var topo *topology.Topology
+		topo = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
+		// the key-value http handler will propose updates to raft
+		raftnode.ServeHttpKVAPI(topo, *s.Port + 1000, confChangeC, errorC)
 	}()
+
+	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
+	glog.V(0).Infoln("Start a disk server ", "at", listeningAddress)
+	// go s.heartbeat()
+
+	if err := http.ListenAndServe(listeningAddress, s.Router); err != nil {
+		glog.Fatalf("service fail to serve: %v", err)
+		return false
+	}
 
 	return true
 }

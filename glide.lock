@@ -1,5 +1,5 @@
 hash: 0329037bd70cb57c54503b8dc6349606bc16379cac0a017996631a9514f6efaa
-updated: 2019-05-16T21:16:27.720433+08:00
+updated: 2019-06-03T21:05:03.377015+08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4b2b341e8d7715fae06375aa633dbb6e91b3fb46
@@ -22,7 +22,7 @@ imports:
 - name: github.com/dustin/go-humanize
   version: 9f541cc9db5d55bce703bd99987c9d5cb8eea45e
 - name: github.com/gogo/protobuf
-  version: 67e450fba6944c63d2f80b7553b0ef522d345962
+  version: 21df5aa0e680850681b8643f0024f92d3b09930c
   subpackages:
   - gogoproto
   - proto
@@ -50,7 +50,7 @@ imports:
   subpackages:
   - pbutil
 - name: github.com/prometheus/client_golang
-  version: f951755f07bdd099e8ef7e308532fe518212d257
+  version: f0a455664ecb0634bfb64d58b0c8226c2dab0804
   subpackages:
   - prometheus
   - prometheus/internal
@@ -59,13 +59,15 @@ imports:
   subpackages:
   - go
 - name: github.com/prometheus/common
-  version: c873fb1f9420b83ee703b4361c61183b4619f74d
+  version: 17f5ca1748182ddf24fc33a5a7caaaf790a52fcc
   subpackages:
   - expfmt
   - internal/bitbucket.org/ww/goautoneg
   - model
 - name: github.com/prometheus/procfs
-  version: 87a4384529e0652f5035fb5cc8095faf73ea9b0b
+  version: 9b1831cbb3bb0a76227ba0e19bdfeba868679544
+  subpackages:
+  - internal/fs
 - name: github.com/xiang90/probing
   version: 43a291ad63a214a207fefbf03c7d9d78b703162b
 - name: go.etcd.io/etcd
@@ -95,7 +97,7 @@ imports:
 - name: go.uber.org/multierr
   version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
 - name: go.uber.org/zap
-  version: 27376062155ad36be76b0f12cf1572a221d3a48c
+  version: 8a2ee5670ced5d94154bf385dc6a362722945daf
   subpackages:
   - buffer
   - internal/bufferpool
@@ -103,9 +105,8 @@ imports:
   - internal/exit
   - zapcore
 - name: golang.org/x/net
-  version: f9ce57c11b242f0f1599cf25c89d8cb02c45295a
+  version: f3200d17e092c607f615320ecaad13d87ad9a2b3
   subpackages:
-  - context
   - http/httpguts
   - http2
   - http2/hpack
@@ -113,11 +114,11 @@ imports:
   - internal/timeseries
   - trace
 - name: golang.org/x/sys
-  version: b4a75ba826a64a70990f11a225237acd6ef35c9f
+  version: 4c3a928424d249a1013e789cf5e458d480bcba16
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: f21a4dfb5e38f5895301dc265a8def02365cc3d0
+  version: 342b2e1fbaa52c93f31447ad2c6abc048c63e475
   subpackages:
   - secure/bidirule
   - transform
@@ -128,11 +129,11 @@ imports:
   subpackages:
   - rate
 - name: google.golang.org/genproto
-  version: 995ef27e003f584103ecdd0f98e1a0cc9cbf3395
+  version: fb225487d10142b5bcc35abfc6cb9a0609614976
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 25c4f928eaa6d96443009bd842389fb4fa48664e
+  version: 869adfc8d5a43efc0d05780ad109106f457f51e4
   subpackages:
   - balancer
   - balancer/base

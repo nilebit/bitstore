@@ -34,7 +34,7 @@ func init() {
 	dn.Debug = DNModule.Flag.Bool("debug", false, "open debug")
 	ManageNode = DNModule.Flag.String("manage", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]...")
 	Folders = DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]...")
-	FolderMaxLimits = DNModule.Flag.String("max", "7", "maximum numbers of File, count[,count]...")
+	FolderMaxLimits = DNModule.Flag.String("max", "1", "maximum numbers of File, count[,count]...")
 }
 
 func RunDN(md *Command, args []string) (ret bool) {

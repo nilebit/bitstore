@@ -9,6 +9,7 @@ import (
 
 var Commands = []*Command{
 	DNModule,
+	MNModule,
 	Version,
 }
 
