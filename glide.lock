@@ -1,5 +1,5 @@
 hash: 0329037bd70cb57c54503b8dc6349606bc16379cac0a017996631a9514f6efaa
-updated: 2019-06-03T21:05:03.377015+08:00
+updated: 2019-06-03T21:30:16.75098+08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4b2b341e8d7715fae06375aa633dbb6e91b3fb46
@@ -18,7 +18,7 @@ imports:
   subpackages:
   - capnslog
 - name: github.com/dgrijalva/jwt-go
-  version: 06ea1031745cb8b3dab3f6a236daf2b0aa468b7e
+  version: 7cd734deee981ccda9fd90491dd093dadf75162a
 - name: github.com/dustin/go-humanize
   version: 9f541cc9db5d55bce703bd99987c9d5cb8eea45e
 - name: github.com/gogo/protobuf
@@ -38,9 +38,9 @@ imports:
   - ptypes/duration
   - ptypes/timestamp
 - name: github.com/gorilla/mux
-  version: c5c6c98bc25355028a63748a498942a6398ccd22
+  version: ed099d42384823742bba0bf9a72b53b55c9e2e38
 - name: github.com/hashicorp/golang-lru
-  version: 7087cb70de9f7a8bc0a10c375cb0d2280a8edf9c
+  version: 59383c442f7d7b190497e9bb8fc17a48d06cd03f
   subpackages:
   - simplelru
 - name: github.com/klauspost/crc32
@@ -71,7 +71,7 @@ imports:
 - name: github.com/xiang90/probing
   version: 43a291ad63a214a207fefbf03c7d9d78b703162b
 - name: go.etcd.io/etcd
-  version: efcc1088f038915f9e5dcc456e7f9d4412a49b74
+  version: ea0f919cdc3de85c54fd6c28e450b1170ccc5846
   subpackages:
   - etcdserver/api/rafthttp
   - etcdserver/api/snap

@@ -11,6 +11,7 @@ import (
 	"go.etcd.io/etcd/raft/raftpb"
 	"go.etcd.io/etcd/wal"
 	"go.etcd.io/etcd/wal/walpb"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"net/url"
@@ -119,7 +120,7 @@ func (rc *raftNode) openWAL(snapshot *raftpb.Snapshot) *wal.WAL {
 			log.Fatalf("raftexample: cannot create dir for wal (%v)", err)
 		}
 
-		w, err := wal.Create(nil, rc.waldir, nil)
+		w, err := wal.Create(zap.NewExample(), rc.waldir, nil)
 		if err != nil {
 			log.Fatalf("raftexample: create wal error (%v)", err)
 		}
@@ -131,7 +132,7 @@ func (rc *raftNode) openWAL(snapshot *raftpb.Snapshot) *wal.WAL {
 		walsnap.Index, walsnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
 	}
 	log.Printf("loading WAL at term %d and index %d", walsnap.Term, walsnap.Index)
-	w, err := wal.Open(nil, rc.waldir, walsnap)
+	w, err := wal.Open(zap.NewExample(), rc.waldir, walsnap)
 	if err != nil {
 		log.Fatalf("raftexample: error loading wal (%v)", err)
 	}
@@ -172,7 +173,7 @@ func (rc *raftNode) startRaft() {
 			glog.Fatalf("raftnode: cannot create dir for snapshot (%v)", err)
 		}
 	}
-	rc.snapshotter = snap.New(nil, rc.snapdir)
+	rc.snapshotter = snap.New(zap.NewExample(), rc.snapdir)
 	rc.snapshotterReady <- rc.snapshotter
 
 	oldwal := FileExist(rc.waldir)
