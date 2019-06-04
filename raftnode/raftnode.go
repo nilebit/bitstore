@@ -93,6 +93,8 @@ func NewRaftNode(id int, peers []string, join bool, metaDir string, getSnapshot 
 		stopc:       make(chan struct{}),
 		httpstopc:   make(chan struct{}),
 		httpdonec:   make(chan struct{}),
+
+		snapshotterReady: make(chan *snap.Snapshotter, 1),
 	}
 
 	go rc.startRaft()
