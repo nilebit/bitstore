@@ -19,7 +19,7 @@ func init() {
 	MNModule.Run = RunMN
 	mn.ID= MNModule.Flag.Int("id", 1, "server id")
 	mn.Port= MNModule.Flag.Int("port", 8080, "http listen port")
-	mn.Ip = MNModule.Flag.String("ip", "0.0.0.0", "ip or server name")
+	mn.Ip = MNModule.Flag.String("ip", "127.0.0.1", "ip or server name")
 	mn.Peers = MNModule.Flag.String("peers", "", "all manage nodes in comma separated ip:port list, example: 127.0.0.1:9093,127.0.0.1:9094")
 	mn.VolumeSizeLimitMB = MNModule.Flag.Uint("volumeSizeLimitMB", 30*1000, "Manage stops directing writes to oversized volumes.")
 	mn.MetaFolder = MNModule.Flag.String("mdir", ".", "data directory to store meta data")

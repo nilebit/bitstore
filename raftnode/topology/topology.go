@@ -91,7 +91,8 @@ func (s *Topology) readCommits(commitC <-chan *string, errorC <-chan error) {
 func (s *Topology) GetSnapshot() ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return json.Marshal(s.collectionMap)
+	// TODO
+	return json.Marshal(nil)
 }
 
 func (s *Topology) recoverFromSnapshot(snapshot []byte) error {

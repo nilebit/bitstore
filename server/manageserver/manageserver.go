@@ -36,7 +36,7 @@ func (s *ManageServer) RegistRouter() {
 }
 
 func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
-	address := *s.Ip + ":" + strconv.Itoa(*s.Port + 10000)
+	address := "http://" + *s.Ip + ":" + strconv.Itoa(*s.Port + 100)
 	peerCount := 0
 	hasSelf := false
 	if *s.Peers != "" {
@@ -44,7 +44,7 @@ func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
 		for _, peer := range tempPeers {
 			ipPort := strings.Split(peer, ":")
 			port, _ := strconv.Atoi(ipPort[1])
-			newAddress := ipPort[0] + ":" + strconv.Itoa(port+10000)
+			newAddress := "http://"+ ipPort[0] + ":" + strconv.Itoa(port+100)
 			if address == newAddress {
 				hasSelf = true
 			}
@@ -66,10 +66,10 @@ func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
 
 func (s *ManageServer) StartServer() bool {
 
-	peers := s.checkPeers()
 	// raft server
 
 	go func() {
+		peers := s.checkPeers()
 		proposeC := make(chan string)
 		defer close(proposeC)
 		confChangeC := make(chan raftpb.ConfChange)

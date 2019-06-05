@@ -6,6 +6,7 @@ import (
 	"github.com/golang/glog"
 	"go.etcd.io/etcd/etcdserver/api/rafthttp"
 	"go.etcd.io/etcd/etcdserver/api/snap"
+	stats "go.etcd.io/etcd/etcdserver/api/v2stats"
 	"go.etcd.io/etcd/pkg/types"
 	"go.etcd.io/etcd/raft"
 	"go.etcd.io/etcd/raft/raftpb"
@@ -16,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -202,6 +204,24 @@ func (rc *raftNode) startRaft() {
 			startPeers = nil
 		}
 		rc.node = raft.StartNode(c, startPeers)
+	}
+
+	rc.transport = &rafthttp.Transport{
+		Logger:      zap.NewExample(),
+		ID:          types.ID(rc.id),
+		ClusterID:   0x1000,
+		Raft:        rc,
+		ServerStats: stats.NewServerStats("", ""),
+		LeaderStats: stats.NewLeaderStats(strconv.Itoa(rc.id)),
+		ErrorC:      make(chan error),
+	}
+
+	rc.transport.Start()
+
+	for i := range rc.peers {
+		if i+1 != rc.id {
+			rc.transport.AddPeer(types.ID(i+1), []string{rc.peers[i]})
+		}
 	}
 
 	go rc.serveRaft()
@@ -446,7 +466,8 @@ func (rc *raftNode) serveChannels() {
 				rc.stop()
 				return
 			}
-			rc.maybeTriggerSnapshot()
+			//TODO
+//			rc.maybeTriggerSnapshot()
 			rc.node.Advance()
 
 		case err := <-rc.transport.ErrorC:
