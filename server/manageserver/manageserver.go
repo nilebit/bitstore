@@ -78,12 +78,11 @@ func (s *ManageServer) StartServer() bool {
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
 
 		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(*s.ID, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
-		var topo *topology.Topology
-		topo = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
+		topo := topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
 		// the key-value http handler will propose updates to raft
-		raftnode.ServeHttpKVAPI(topo, *s.Port + 1000, confChangeC, errorC)
+		topo.ConfChangeC = confChangeC
+		raftnode.ServeDiskNode(topo, *s.Port + 1000, errorC)
 	}()
-
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
 	glog.V(0).Infoln("Start a disk server ", "at", listeningAddress)
 	// go s.heartbeat()

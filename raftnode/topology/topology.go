@@ -3,7 +3,10 @@ package topology
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/pb"
 	"go.etcd.io/etcd/etcdserver/api/snap"
+	"go.etcd.io/etcd/raft/raftpb"
 	"log"
 	"sync"
 )
@@ -16,6 +19,44 @@ type Topology struct {
 	collectionMap *ConcurrentReadMap
 	chanFullVolumes chan VolumeInfo
 	volumeSizeLimit uint64
+	ConfChangeC chan<- raftpb.ConfChange
+}
+
+/*
+func (t *Topology) GetVolumeLayout(collectionName string, rp *replicate.Placement, ttl *ttl.TTL) *VolumeLayout {
+	return t.collectionMap.Get(collectionName, func() interface{} {
+		return NewCollection(collectionName, t.volumeSizeLimit)
+	}).(*Collection).GetOrCreateVolumeLayout(rp, ttl)
+}
+
+func (t *Topology) UnRegisterDataNode(dn *DataNode) {
+	for _, v := range dn.GetVolumes() {
+		glog.V(0).Infoln("Removing Volume", v.Id, "from the dead volume server", dn.Id())
+		vl := t.GetVolumeLayout(v.Collection, v.ReplicaPlacement, v.Ttl)
+		vl.SetVolumeUnavailable(dn, v.Id)
+	}
+	dn.UpAdjustVolumeCountDelta(-dn.GetVolumeCount())
+	dn.UpAdjustActiveVolumeCountDelta(-dn.GetActiveVolumeCount())
+	dn.UpAdjustMaxVolumeCountDelta(-dn.GetMaxVolumeCount())
+	dn.Parent().UnlinkChildNode(dn.Id())
+}
+*/
+func (t *Topology) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
+	var dn *DataNode
+	for {
+		_, err := stream.Recv()
+		if err != nil {
+			if dn != nil {
+				glog.V(0).Infof("lost volume server %s:%d", dn.Ip, dn.Port)
+		//		t.UnRegisterDataNode(dn)
+			}
+			return err
+		}
+
+		if dn == nil {
+
+		}
+	}
 }
 
 func NewTopology(volumeSizeLimit uint64,
