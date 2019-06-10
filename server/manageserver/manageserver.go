@@ -87,7 +87,7 @@ func (s *ManageServer) StartServer() bool {
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
 	listener, e := util.NewListener(listeningAddress, 0)
 	if e != nil {
-		glog.Fatalf("Master startup error: %v", e)
+		glog.Fatalf("manage node server startup error: %v", e)
 	}
 	m := cmux.New(listener)
 	grpcL := m.Match(cmux.HTTP2HeaderField("content-type", "application/grpc"))
@@ -104,7 +104,7 @@ func (s *ManageServer) StartServer() bool {
 	go httpS.Serve(httpL)
 
 	if err := m.Serve(); err != nil {
-		glog.Fatalf("master server failed to serve: %v", err)
+		glog.Fatalf("manage node server failed to serve: %v", err)
 	}
 
 	return true
