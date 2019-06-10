@@ -65,9 +65,7 @@ func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
 }
 
 func (s *ManageServer) StartServer() bool {
-
 	// raft server
-
 	go func() {
 		peers := s.checkPeers()
 		proposeC := make(chan string)
@@ -76,17 +74,20 @@ func (s *ManageServer) StartServer() bool {
 		defer close(confChangeC)
 		// raft provides a commit stream for the proposals from the http api
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
-
 		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(*s.ID, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
-		topo := topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
-		// the key-value http handler will propose updates to raft
-		topo.ConfChangeC = confChangeC
-		raftnode.ServeDiskNode(topo, *s.Port + 1000, errorC)
+		// new topology
+		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
+		s.topos.ConfChangeC = confChangeC
+		// start a rpc server
+		err := s.topos.StartServer(*s.Port + 1000)
+		if err != nil {
+			glog.Fatalf("rpc service fail: %v", err)
+			return
+		}
 	}()
+	// start a manage node server
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
 	glog.V(0).Infoln("Start a disk server ", "at", listeningAddress)
-	// go s.heartbeat()
-
 	if err := http.ListenAndServe(listeningAddress, s.Router); err != nil {
 		glog.Fatalf("service fail to serve: %v", err)
 		return false

@@ -7,7 +7,10 @@ import (
 	"github.com/nilebit/bitstore/pb"
 	"go.etcd.io/etcd/etcdserver/api/snap"
 	"go.etcd.io/etcd/raft/raftpb"
+	"google.golang.org/grpc"
 	"log"
+	"net"
+	"strconv"
 	"sync"
 )
 
@@ -47,7 +50,7 @@ func (t *Topology) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
 		_, err := stream.Recv()
 		if err != nil {
 			if dn != nil {
-				glog.V(0).Infof("lost volume server %s:%d", dn.Ip, dn.Port)
+				glog.V(0).Infof("lost disk node server %s:%d", dn.Ip, dn.Port)
 		//		t.UnRegisterDataNode(dn)
 			}
 			return err
@@ -57,6 +60,22 @@ func (t *Topology) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
 
 		}
 	}
+}
+
+func (topo *Topology)StartServer( port int) error {
+	address := ":" + strconv.Itoa(port)
+	lis, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+		return err
+	}
+	s := grpc.NewServer()
+	pb.RegisterSeaweedServer(s, topo)
+	if err := s.Serve(lis); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewTopology(volumeSizeLimit uint64,
