@@ -3,84 +3,26 @@ package topology
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/pb"
 	"go.etcd.io/etcd/etcdserver/api/snap"
 	"go.etcd.io/etcd/raft/raftpb"
-	"google.golang.org/grpc"
 	"log"
-	"net"
-	"strconv"
 	"sync"
 )
 
 type Topology struct {
-	proposeC    chan<- string // channel for proposing updates
-	mu          sync.RWMutex
-	snapshotter *snap.Snapshotter
+	proposeC    	chan<- string // channel for proposing updates
+	mu          	sync.RWMutex
+	snapshotter 	*snap.Snapshotter
 	NodeImpl
-	collectionMap *ConcurrentReadMap
+	collectionMap 	*ConcurrentReadMap
 	chanFullVolumes chan VolumeInfo
 	volumeSizeLimit uint64
-	ConfChangeC chan<- raftpb.ConfChange
-}
-
-/*
-func (t *Topology) GetVolumeLayout(collectionName string, rp *replicate.Placement, ttl *ttl.TTL) *VolumeLayout {
-	return t.collectionMap.Get(collectionName, func() interface{} {
-		return NewCollection(collectionName, t.volumeSizeLimit)
-	}).(*Collection).GetOrCreateVolumeLayout(rp, ttl)
-}
-
-func (t *Topology) UnRegisterDataNode(dn *DataNode) {
-	for _, v := range dn.GetVolumes() {
-		glog.V(0).Infoln("Removing Volume", v.Id, "from the dead volume server", dn.Id())
-		vl := t.GetVolumeLayout(v.Collection, v.ReplicaPlacement, v.Ttl)
-		vl.SetVolumeUnavailable(dn, v.Id)
-	}
-	dn.UpAdjustVolumeCountDelta(-dn.GetVolumeCount())
-	dn.UpAdjustActiveVolumeCountDelta(-dn.GetActiveVolumeCount())
-	dn.UpAdjustMaxVolumeCountDelta(-dn.GetMaxVolumeCount())
-	dn.Parent().UnlinkChildNode(dn.Id())
-}
-*/
-func (t *Topology) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
-	var dn *DataNode
-	for {
-		_, err := stream.Recv()
-		if err != nil {
-			if dn != nil {
-				glog.V(0).Infof("lost disk node server %s:%d", dn.Ip, dn.Port)
-		//		t.UnRegisterDataNode(dn)
-			}
-			return err
-		}
-
-		if dn == nil {
-
-		}
-	}
-}
-
-func (topo *Topology)StartServer( port int) error {
-	address := ":" + strconv.Itoa(port)
-	lis, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-		return err
-	}
-	s := grpc.NewServer()
-	pb.RegisterSeaweedServer(s, topo)
-	if err := s.Serve(lis); err != nil {
-		return err
-	}
-
-	return nil
+	confChangeC 	chan<- raftpb.ConfChange
 }
 
 func NewTopology(volumeSizeLimit uint64,
-	snapshotter *snap.Snapshotter, proposeC chan<- string, commitC <-chan *string, errorC <-chan error) *Topology {
-	t := &Topology{proposeC: proposeC, snapshotter: snapshotter}
+	snapshotter *snap.Snapshotter, proposeC chan<- string, commitC <-chan *string, errorC <-chan error, confChangeC chan<- raftpb.ConfChange) *Topology {
+	t := &Topology{proposeC: proposeC, snapshotter: snapshotter, confChangeC: confChangeC}
 	t.collectionMap = NewConcurrentReadMap()
 	t.id = NodeId("topo")
 	t.volumeSizeLimit = volumeSizeLimit

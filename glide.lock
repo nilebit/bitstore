@@ -1,5 +1,5 @@
 hash: 0329037bd70cb57c54503b8dc6349606bc16379cac0a017996631a9514f6efaa
-updated: 2019-06-03T21:30:16.75098+08:00
+updated: 2019-06-10T17:13:11.772358+08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4b2b341e8d7715fae06375aa633dbb6e91b3fb46
@@ -33,6 +33,7 @@ imports:
   version: b5d812f8a3706043e23a9cd5babf2e5423744d30
   subpackages:
   - proto
+  - protoc-gen-go/descriptor
   - ptypes
   - ptypes/any
   - ptypes/duration
@@ -50,7 +51,7 @@ imports:
   subpackages:
   - pbutil
 - name: github.com/prometheus/client_golang
-  version: f0a455664ecb0634bfb64d58b0c8226c2dab0804
+  version: 2e1bc8f8ec7648442b4c3cb339fc4ca4737ba606
   subpackages:
   - prometheus
   - prometheus/internal
@@ -65,13 +66,15 @@ imports:
   - internal/bitbucket.org/ww/goautoneg
   - model
 - name: github.com/prometheus/procfs
-  version: 9b1831cbb3bb0a76227ba0e19bdfeba868679544
+  version: 1de2bc567d78f4ff415fd103412f7e5ec9e8876b
   subpackages:
   - internal/fs
+- name: github.com/soheilhy/cmux
+  version: 8a8ea3c53959009183d7914522833c1ed8835020
 - name: github.com/xiang90/probing
   version: 43a291ad63a214a207fefbf03c7d9d78b703162b
 - name: go.etcd.io/etcd
-  version: ea0f919cdc3de85c54fd6c28e450b1170ccc5846
+  version: d6280f9ea54849e5364545ca34bdac0a58317569
   subpackages:
   - etcdserver/api/rafthttp
   - etcdserver/api/snap
@@ -105,8 +108,9 @@ imports:
   - internal/exit
   - zapcore
 - name: golang.org/x/net
-  version: f3200d17e092c607f615320ecaad13d87ad9a2b3
+  version: 461777fb6f67e8cb9d70cda16573678d085a74cf
   subpackages:
+  - context
   - http/httpguts
   - http2
   - http2/hpack
@@ -114,7 +118,7 @@ imports:
   - internal/timeseries
   - trace
 - name: golang.org/x/sys
-  version: 4c3a928424d249a1013e789cf5e458d480bcba16
+  version: 301114b31cced3624480dfb114ca1b495ec69aa5
   subpackages:
   - unix
 - name: golang.org/x/text
@@ -129,11 +133,11 @@ imports:
   subpackages:
   - rate
 - name: google.golang.org/genproto
-  version: fb225487d10142b5bcc35abfc6cb9a0609614976
+  version: eb0b1bdb6ae60fcfc41b8d907b50dfb346112301
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 869adfc8d5a43efc0d05780ad109106f457f51e4
+  version: 501c41df7f472c740d0674ff27122f3f48c80ce7
   subpackages:
   - balancer
   - balancer/base
@@ -160,6 +164,8 @@ imports:
   - metadata
   - naming
   - peer
+  - reflection
+  - reflection/grpc_reflection_v1alpha
   - resolver
   - resolver/dns
   - resolver/passthrough

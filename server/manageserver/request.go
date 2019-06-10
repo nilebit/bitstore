@@ -2,6 +2,9 @@ package manageserver
 
 import (
 	"encoding/json"
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/pb"
+	"github.com/nilebit/bitstore/raftnode/topology"
 	"net/http"
 	"runtime"
 	"runtime/debug"
@@ -24,4 +27,22 @@ func (s *ManageServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(bytes)
 	return
+}
+
+func (s *ManageServer) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
+	var dn *topology.DataNode
+	for {
+		_, err := stream.Recv()
+		if err != nil {
+			if dn != nil {
+				glog.V(0).Infof("lost disk node server %s:%d", dn.Ip, dn.Port)
+				//		t.UnRegisterDataNode(dn)
+			}
+			return err
+		}
+
+		if dn == nil {
+
+		}
+	}
 }

@@ -3,9 +3,14 @@ package manageserver
 import (
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
+	"github.com/nilebit/bitstore/pb"
 	"github.com/nilebit/bitstore/raftnode"
 	"github.com/nilebit/bitstore/raftnode/topology"
+	"github.com/nilebit/bitstore/util"
+	"github.com/soheilhy/cmux"
 	"go.etcd.io/etcd/raft/raftpb"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"net/http"
 	"strconv"
 	"strings"
@@ -76,21 +81,30 @@ func (s *ManageServer) StartServer() bool {
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
 		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(*s.ID, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
 		// new topology
-		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC)
-		s.topos.ConfChangeC = confChangeC
-		// start a rpc server
-		err := s.topos.StartServer(*s.Port + 1000)
-		if err != nil {
-			glog.Fatalf("rpc service fail: %v", err)
-			return
-		}
+		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC, confChangeC)
 	}()
 	// start a manage node server
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
-	glog.V(0).Infoln("Start a disk server ", "at", listeningAddress)
-	if err := http.ListenAndServe(listeningAddress, s.Router); err != nil {
-		glog.Fatalf("service fail to serve: %v", err)
-		return false
+	listener, e := util.NewListener(listeningAddress, 0)
+	if e != nil {
+		glog.Fatalf("Master startup error: %v", e)
+	}
+	m := cmux.New(listener)
+	grpcL := m.Match(cmux.HTTP2HeaderField("content-type", "application/grpc"))
+	httpL := m.Match(cmux.Any())
+
+	// Create your protocol servers.
+	grpcS := grpc.NewServer()
+	pb.RegisterSeaweedServer(grpcS, s)
+	reflection.Register(grpcS)
+
+	httpS := &http.Server{Handler: s.Router}
+
+	go grpcS.Serve(grpcL)
+	go httpS.Serve(httpL)
+
+	if err := m.Serve(); err != nil {
+		glog.Fatalf("master server failed to serve: %v", err)
 	}
 
 	return true
