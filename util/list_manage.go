@@ -2,26 +2,18 @@ package util
 
 import (
 	"context"
-	"time"
-
+	"encoding/json"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+	"time"
+
+	"github.com/golang/glog"
 )
 
-func NewGrpcServer(opts ...grpc.ServerOption) *grpc.Server {
-	var options []grpc.ServerOption
-	options = append(options, grpc.KeepaliveParams(keepalive.ServerParameters{
-		Time:    10 * time.Second, // wait time before ping if no activity
-		Timeout: 20 * time.Second, // ping timeout
-	}), grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-		MinTime: 60 * time.Second, // min time a client should wait before sending a ping
-	}))
-	for _, opt := range opts {
-		if opt != nil {
-			options = append(options, opt)
-		}
-	}
-	return grpc.NewServer(options...)
+type ClusterStatusResult struct {
+	IsLeader bool     `json:"IsLeader,omitempty"`
+	Leader   string   `json:"Leader,omitempty"`
+	Peers    []string `json:"Peers,omitempty"`
 }
 
 func GrpcDial(ctx context.Context, address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
@@ -40,4 +32,22 @@ func GrpcDial(ctx context.Context, address string, opts ...grpc.DialOption) (*gr
 		}
 	}
 	return grpc.DialContext(ctx, address, options...)
+}
+
+func ListManage(server string) (leader string, peers []string, err error) {
+	jsonBlob, err := Get("http://" + server + "/cluster/status")
+	glog.V(2).Info("list Manage result :", string(jsonBlob))
+	if err != nil {
+		return "", nil, err
+	}
+	var ret ClusterStatusResult
+	err = json.Unmarshal(jsonBlob, &ret)
+	if err != nil {
+		return "", nil, err
+	}
+	peers = ret.Peers
+	if ret.IsLeader {
+		peers = append(peers, ret.Leader)
+	}
+	return ret.Leader, peers, nil
 }

@@ -32,6 +32,7 @@ func init() {
 	dn.DataCenter = DNModule.Flag.String("dataCenter", "", "current dss server's data center name")
 	dn.Rack = DNModule.Flag.String("rack", "", "current volume server's rack name")
 	dn.Debug = DNModule.Flag.Bool("debug", false, "open debug")
+	dn.PulseSeconds = DNModule.Flag.Int("pulseSeconds", 5, "number of seconds between heartbeats, must be smaller than or equal to the manage's setting")
 	ManageNode = DNModule.Flag.String("manage", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]...")
 	Folders = DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]...")
 	FolderMaxLimits = DNModule.Flag.String("max", "1", "maximum numbers of File, count[,count]...")

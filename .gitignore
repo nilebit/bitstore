@@ -8,4 +8,4 @@ vendor
 build
 log
 store
-dataDir
+data
