@@ -1,31 +1,30 @@
 package manageserver
 
 import (
-	"github.com/golang/glog"
-	"github.com/gorilla/mux"
-	"github.com/nilebit/bitstore/pb"
-	"github.com/nilebit/bitstore/raftnode"
-	"github.com/nilebit/bitstore/raftnode/topology"
-	"github.com/nilebit/bitstore/util"
-	"github.com/soheilhy/cmux"
-	"go.etcd.io/etcd/raft/raftpb"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
+	"github.com/gorilla/mux"
+	"github.com/nilebit/bitstore/pb"
+	"github.com/nilebit/bitstore/topology"
+	"github.com/nilebit/bitstore/util"
+	"github.com/soheilhy/cmux"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 type ManageServer struct {
-	ID						*int
-	Ip 						*string
-	Port                    *int
-	MetaFolder              *string
-	VolumeSizeLimitMB       *uint
-	Peers					*string
-	MaxCpu					*int
-	Router          		*mux.Router
-	topos 					*topology.Topology
+	ID                *int
+	Ip                *string
+	Port              *int
+	MetaFolder        *string
+	VolumeSizeLimitMB *uint
+	Peers             *string
+	MaxCpu            *int
+	Router            *mux.Router
+	topos             *topology.Topology
 }
 
 func NewManageServer() *ManageServer {
@@ -36,12 +35,13 @@ func (s *ManageServer) RegistRouter() {
 	paramMux := mux.NewRouter().SkipClean(false)
 	apiRouter := paramMux.NewRoute().PathPrefix("/").Subrouter()
 	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.StatusHandler)
+	apiRouter.Methods("GET").Path("/cluster/status").HandlerFunc(s.ClusterStatusHandler)
 
 	s.Router = apiRouter
 }
 
-func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
-	address := "http://" + *s.Ip + ":" + strconv.Itoa(*s.Port + 100)
+func (s *ManageServer) checkPeers() (cleanedPeers []string) {
+	address := "http://" + *s.Ip + ":" + strconv.Itoa(*s.Port+100)
 	peerCount := 0
 	hasSelf := false
 	if *s.Peers != "" {
@@ -49,7 +49,7 @@ func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
 		for _, peer := range tempPeers {
 			ipPort := strings.Split(peer, ":")
 			port, _ := strconv.Atoi(ipPort[1])
-			newAddress := "http://"+ ipPort[0] + ":" + strconv.Itoa(port+100)
+			newAddress := "http://" + ipPort[0] + ":" + strconv.Itoa(port+100)
 			if address == newAddress {
 				hasSelf = true
 			}
@@ -63,25 +63,21 @@ func (s *ManageServer) checkPeers() (cleanedPeers []string)  {
 		peerCount++
 	}
 
-	if peerCount % 2 == 0 {
+	if peerCount%2 == 0 {
 		glog.Fatalf("Only odd number of manage are supported!")
 	}
 	return
 }
 
+// StartServer start a rpc and http service
 func (s *ManageServer) StartServer() bool {
 	// raft server
 	go func() {
-		peers := s.checkPeers()
-		proposeC := make(chan string)
-		defer close(proposeC)
-		confChangeC := make(chan raftpb.ConfChange)
-		defer close(confChangeC)
 		// raft provides a commit stream for the proposals from the http api
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
-		commitC, errorC, SnapshotterReady := raftnode.NewRaftNode(*s.ID, peers, false, *s.MetaFolder, getSnapshot, proposeC, confChangeC)
+		rc := topology.NewRaftNode(*s.ID, s.checkPeers(), false, *s.MetaFolder, getSnapshot)
 		// new topology
-		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), <-SnapshotterReady, proposeC, commitC, errorC, confChangeC)
+		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), rc)
 	}()
 	// start a manage node server
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)

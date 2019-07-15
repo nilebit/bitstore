@@ -1,10 +1,11 @@
 package command
 
 import (
+	"runtime"
+
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/server/manageserver"
 	"github.com/nilebit/bitstore/util"
-	"runtime"
 )
 
 var mn = manageserver.NewManageServer()
@@ -17,8 +18,8 @@ var MNModule = &Command{
 
 func init() {
 	MNModule.Run = RunMN
-	mn.ID= MNModule.Flag.Int("id", 1, "server id")
-	mn.Port= MNModule.Flag.Int("port", 8080, "http listen port")
+	mn.ID = MNModule.Flag.Int("id", 1, "server id")
+	mn.Port = MNModule.Flag.Int("port", 8080, "http listen port")
 	mn.Ip = MNModule.Flag.String("ip", "127.0.0.1", "ip or server name")
 	mn.Peers = MNModule.Flag.String("peers", "", "all manage nodes in comma separated ip:port list, example: 127.0.0.1:9093,127.0.0.1:9094")
 	mn.VolumeSizeLimitMB = MNModule.Flag.Uint("volumeSizeLimitMB", 30*1000, "Manage stops directing writes to oversized volumes.")

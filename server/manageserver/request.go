@@ -2,13 +2,17 @@ package manageserver
 
 import (
 	"encoding/json"
-	"github.com/golang/glog"
-	"github.com/nilebit/bitstore/pb"
-	"github.com/nilebit/bitstore/raftnode/topology"
 	"net/http"
 	"runtime"
 	"runtime/debug"
+
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/pb"
+	"github.com/nilebit/bitstore/topology"
+	"github.com/nilebit/bitstore/util"
 )
+
+// StatusHandler Server status
 func (s *ManageServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	stat := make(map[string]interface{})
 	stat["cpu"] = runtime.NumCPU()
@@ -29,6 +33,7 @@ func (s *ManageServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// SendHeartbeat deal Heartbeat
 func (s *ManageServer) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
 	var dn *topology.DataNode
 	for {
@@ -45,4 +50,20 @@ func (s *ManageServer) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) erro
 
 		}
 	}
+}
+
+// ClusterStatusHandler cluster status
+func (s *ManageServer) ClusterStatusHandler(w http.ResponseWriter, r *http.Request) {
+	var stat util.ClusterStatusResult
+
+	stat.IsLeader = false
+
+	bytes, err := json.Marshal(&stat)
+	if err != nil {
+		bytes = []byte("json marshal error")
+	}
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(bytes)
+	return
 }
