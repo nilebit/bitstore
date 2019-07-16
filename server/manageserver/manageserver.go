@@ -15,14 +15,16 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+// ManageServer 管理节点结构
 type ManageServer struct {
 	ID                *int
-	Ip                *string
+	IP                *string
 	Port              *int
+	RaftPort          *int
 	MetaFolder        *string
 	VolumeSizeLimitMB *uint
 	Peers             *string
-	MaxCpu            *int
+	MaxCPU            *int
 	Router            *mux.Router
 	topos             *topology.Topology
 }
@@ -31,6 +33,7 @@ func NewManageServer() *ManageServer {
 	return &ManageServer{}
 }
 
+// RegistRouter 注册ROUTER
 func (s *ManageServer) RegistRouter() {
 	paramMux := mux.NewRouter().SkipClean(false)
 	apiRouter := paramMux.NewRoute().PathPrefix("/").Subrouter()
@@ -40,27 +43,22 @@ func (s *ManageServer) RegistRouter() {
 	s.Router = apiRouter
 }
 
-func (s *ManageServer) checkPeers() (cleanedPeers []string) {
-	address := "http://" + *s.Ip + ":" + strconv.Itoa(*s.Port+100)
-	peerCount := 0
-	hasSelf := false
+func (s *ManageServer) checkPeers() (allPeers []string) {
+	self := "http://" + *s.IP + ":" + strconv.Itoa(*s.RaftPort)
+	allPeers = append(allPeers, self)
+	peerCount := 1
 	if *s.Peers != "" {
 		tempPeers := strings.Split(*s.Peers, ",")
 		for _, peer := range tempPeers {
-			ipPort := strings.Split(peer, ":")
-			port, _ := strconv.Atoi(ipPort[1])
-			newAddress := "http://" + ipPort[0] + ":" + strconv.Itoa(port+100)
-			if address == newAddress {
-				hasSelf = true
+			host := strings.Split(peer, ":")
+			port, _ := strconv.Atoi(host[1])
+			newAddress := "http://" + host[0] + ":" + strconv.Itoa(port)
+			if newAddress == self {
+				continue
 			}
-			cleanedPeers = append(cleanedPeers, newAddress)
+			allPeers = append(allPeers, newAddress)
 			peerCount++
 		}
-	}
-
-	if hasSelf == false {
-		cleanedPeers = append(cleanedPeers, address)
-		peerCount++
 	}
 
 	if peerCount%2 == 0 {
@@ -80,7 +78,7 @@ func (s *ManageServer) StartServer() bool {
 		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), rc)
 	}()
 	// start a manage node server
-	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
+	listeningAddress := *s.IP + ":" + strconv.Itoa(*s.Port)
 	listener, e := util.NewListener(listeningAddress, 0)
 	if e != nil {
 		glog.Fatalf("manage node server startup error: %v", e)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/util"
 	"go.etcd.io/etcd/etcdserver/api/rafthttp"
 	"go.etcd.io/etcd/etcdserver/api/snap"
 	stats "go.etcd.io/etcd/etcdserver/api/v2stats"
@@ -462,7 +463,7 @@ func (rc *RaftNode) serveChannels() {
 				return
 			}
 			//TODO
-			//			rc.maybeTriggerSnapshot()
+//			rc.maybeTriggerSnapshot()
 			rc.node.Advance()
 
 		case err := <-rc.transport.ErrorC:
@@ -476,11 +477,20 @@ func (rc *RaftNode) serveChannels() {
 	}
 }
 
+// Process Raft node process
 func (rc *RaftNode) Process(ctx context.Context, m raftpb.Message) error {
 	return rc.node.Step(ctx, m)
 }
-func (rc *RaftNode) IsIDRemoved(id uint64) bool                           { return false }
-func (rc *RaftNode) ReportUnreachable(id uint64)                          {}
+
+// IsIDRemoved removed
+func (rc *RaftNode) IsIDRemoved(id uint64) bool {
+	return false
+}
+
+// ReportUnreachable Report Unreachable
+func (rc *RaftNode) ReportUnreachable(id uint64) {}
+
+// ReportSnapshot Report Snapshot
 func (rc *RaftNode) ReportSnapshot(id uint64, status raft.SnapshotStatus) {}
 
 // ReadCommitC Read commitC
@@ -491,4 +501,22 @@ func (rc *RaftNode) ReadCommitC() <-chan *string {
 // ReadErrorC Read ErrorC
 func (rc *RaftNode) ReadErrorC() <-chan error {
 	return rc.errorC
+}
+
+// ReadStatus Read node status
+func (rc *RaftNode) ReadStatus() (stat util.ClusterStatusResult) {
+	nodestatus := rc.node.Status()
+
+	if nodestatus.Lead == uint64(rc.id) {
+		stat.IsLeader = true
+	}
+	url, err := url.Parse(rc.peers[nodestatus.Lead-1])
+	if err == nil {
+		stat.Leader = url.Host
+	} else {
+		log.Fatalf("raftnode: Failed parsing URL (%v)", err)
+	}
+	stat.Peers = rc.peers
+
+	return stat
 }

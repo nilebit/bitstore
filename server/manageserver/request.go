@@ -9,7 +9,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/pb"
 	"github.com/nilebit/bitstore/topology"
-	"github.com/nilebit/bitstore/util"
 )
 
 // StatusHandler Server status
@@ -54,9 +53,7 @@ func (s *ManageServer) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) erro
 
 // ClusterStatusHandler cluster status
 func (s *ManageServer) ClusterStatusHandler(w http.ResponseWriter, r *http.Request) {
-	var stat util.ClusterStatusResult
-
-	stat.IsLeader = false
+	stat := s.topos.RNode.ReadStatus()
 
 	bytes, err := json.Marshal(&stat)
 	if err != nil {

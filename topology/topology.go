@@ -26,7 +26,7 @@ func NewTopology(volumeSizeLimit uint64, node *RaftNode) *Topology {
 	t.children = make(map[NodeId]Node)
 	t.chanFullVolumes = make(chan VolumeInfo)
 	// replay log
-	t.readCommits()
+//	t.readCommits()
 	// read commits from raft into kvStore map until error
 	go t.readCommits()
 	return t
