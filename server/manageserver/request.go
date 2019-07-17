@@ -6,9 +6,7 @@ import (
 	"runtime"
 	"runtime/debug"
 
-	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/pb"
-	"github.com/nilebit/bitstore/topology"
 )
 
 // StatusHandler Server status
@@ -34,18 +32,9 @@ func (s *ManageServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 // SendHeartbeat deal Heartbeat
 func (s *ManageServer) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
-	var dn *topology.DataNode
 	for {
 		_, err := stream.Recv()
 		if err != nil {
-			if dn != nil {
-				glog.V(0).Infof("lost disk node server %s:%d", dn.Ip, dn.Port)
-				//		t.UnRegisterDataNode(dn)
-			}
-			return err
-		}
-
-		if dn == nil {
 
 		}
 	}
@@ -53,7 +42,7 @@ func (s *ManageServer) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) erro
 
 // ClusterStatusHandler cluster status
 func (s *ManageServer) ClusterStatusHandler(w http.ResponseWriter, r *http.Request) {
-	stat := s.topos.RNode.ReadStatus()
+	stat := s.RNode.ReadStatus()
 
 	bytes, err := json.Marshal(&stat)
 	if err != nil {
@@ -62,5 +51,7 @@ func (s *ManageServer) ClusterStatusHandler(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(bytes)
+
+	s.RNode.Propose("1","test")
 	return
 }

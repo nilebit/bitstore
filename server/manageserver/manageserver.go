@@ -4,7 +4,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"github.com/nilebit/bitstore/pb"
-	"github.com/nilebit/bitstore/topology"
 	"github.com/nilebit/bitstore/util"
 	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
@@ -23,7 +22,7 @@ type ManageServer struct {
 	Advertise		  *string
 	MaxCPU            *int
 	Router            *mux.Router
-	topos             *topology.Topology
+	RNode          	  *RaftNode
 }
 
 func NewManageServer() *ManageServer {
@@ -43,15 +42,11 @@ func (s *ManageServer) RegistRouter() {
 // StartServer start a rpc and http service
 func (s *ManageServer) StartServer() bool {
 	// raft server
-	go func() {
-		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
-		rc, err := topology.NewRaftNode(*s.Advertise, *s.Cluster, false, *s.MetaFolder, getSnapshot)
-		if err != nil {
-			glog.Fatalf("manage node server failed to new raft node: %v", err)
-		}
-		// new topology
-		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), rc)
-	}()
+	var err error
+	s.RNode, err = newRaftNode(*s.Advertise, *s.Cluster, false, *s.MetaFolder)
+	if err != nil {
+		glog.Fatalf("manage node server failed to new raft node: %v", err)
+	}
 	// start a manage node server
 	listeningAddress := *s.IP + ":" + strconv.Itoa(*s.Port)
 	listener, e := util.NewListener(listeningAddress, 0)
