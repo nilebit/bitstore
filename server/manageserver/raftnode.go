@@ -27,7 +27,7 @@ import (
 
 const (
 	// ElectionTickTime 选举超时
-	ElectionTickTime int = 20
+	ElectionTickTime int = 10
 	// HeartbeatTickTime 心跳超时
 	HeartbeatTickTime int = 5
 	// MaxSizePerMsg 每包最大值
@@ -501,7 +501,7 @@ func (rc *RaftNode) serveChannels() {
 				return
 			}
 			//TODO
-//			rc.maybeTriggerSnapshot()
+			rc.maybeTriggerSnapshot()
 			rc.node.Advance()
 
 		case err := <-rc.transport.ErrorC:
