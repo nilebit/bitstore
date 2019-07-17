@@ -1,10 +1,6 @@
 package manageserver
 
 import (
-	"net/http"
-	"strconv"
-	"strings"
-
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"github.com/nilebit/bitstore/pb"
@@ -13,17 +9,18 @@ import (
 	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"net/http"
+	"strconv"
 )
 
 // ManageServer 管理节点结构
 type ManageServer struct {
-	ID                *int
 	IP                *string
 	Port              *int
-	RaftPort          *int
 	MetaFolder        *string
 	VolumeSizeLimitMB *uint
-	Peers             *string
+	Cluster           *string
+	Advertise		  *string
 	MaxCPU            *int
 	Router            *mux.Router
 	topos             *topology.Topology
@@ -43,37 +40,15 @@ func (s *ManageServer) RegistRouter() {
 	s.Router = apiRouter
 }
 
-func (s *ManageServer) checkPeers() (allPeers []string) {
-	self := "http://" + *s.IP + ":" + strconv.Itoa(*s.RaftPort)
-	allPeers = append(allPeers, self)
-	peerCount := 1
-	if *s.Peers != "" {
-		tempPeers := strings.Split(*s.Peers, ",")
-		for _, peer := range tempPeers {
-			host := strings.Split(peer, ":")
-			port, _ := strconv.Atoi(host[1])
-			newAddress := "http://" + host[0] + ":" + strconv.Itoa(port)
-			if newAddress == self {
-				continue
-			}
-			allPeers = append(allPeers, newAddress)
-			peerCount++
-		}
-	}
-
-	if peerCount%2 == 0 {
-		glog.Fatalf("Only odd number of manage are supported!")
-	}
-	return
-}
-
 // StartServer start a rpc and http service
 func (s *ManageServer) StartServer() bool {
 	// raft server
 	go func() {
-		// raft provides a commit stream for the proposals from the http api
 		getSnapshot := func() ([]byte, error) { return s.topos.GetSnapshot() }
-		rc := topology.NewRaftNode(*s.ID, s.checkPeers(), false, *s.MetaFolder, getSnapshot)
+		rc, err := topology.NewRaftNode(*s.Advertise, *s.Cluster, false, *s.MetaFolder, getSnapshot)
+		if err != nil {
+			glog.Fatalf("manage node server failed to new raft node: %v", err)
+		}
 		// new topology
 		s.topos = topology.NewTopology(uint64(*s.VolumeSizeLimitMB), rc)
 	}()

@@ -19,11 +19,10 @@ var MNModule = &Command{
 
 func init() {
 	MNModule.Run = RunMN
-	mn.ID = MNModule.Flag.Int("id", 1, "server id")
 	mn.Port = MNModule.Flag.Int("port", 8000, "http listen port")
-	mn.RaftPort = MNModule.Flag.Int("rport", 8100, "Raft listen port")
 	mn.IP = MNModule.Flag.String("ip", "127.0.0.1", "ip or server name")
-	mn.Peers = MNModule.Flag.String("peers", "127.0.0.1:8100", "all manage nodes in comma separated ip:port list, example: 10.0.0.1:8100,10.0.0.2:8100")
+	mn.Advertise = MNModule.Flag.String("advertise-urls", "http://127.0.0.1:8100", "list of URLs to listen on for peer traffic.")
+	mn.Cluster = MNModule.Flag.String("cluster-urls", "http://127.0.0.1:8100", "cluster configuration for bootstrapping. example: http://10.0.0.1:8100,http://10.0.0.2:8100")
 	mn.VolumeSizeLimitMB = MNModule.Flag.Uint("volumeSizeLimitMB", 30000, "Manage stops directing writes to oversized volumes.")
 	mn.MetaFolder = MNModule.Flag.String("mdir", "./data", "data directory to store meta data")
 	mn.MaxCPU = MNModule.Flag.Int("maxCpu", 0, "maximum number of CPUs. 0 means all available CPUs")

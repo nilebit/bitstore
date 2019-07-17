@@ -2,12 +2,14 @@ package topology
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -32,14 +34,19 @@ const (
 	MaxSizePerMsg uint64 = 4194304
 )
 
+type Member struct {
+	ID uint64
+	Urls string
+}
+
 // RaftNode A key-value stream backed by raft
 type RaftNode struct {
 	proposeC         chan string            // proposed messages (k,v)
 	confChangeC      chan raftpb.ConfChange // proposed cluster config changes
 	commitC          chan *string           // entries committed to log (k,v)
 	errorC           chan error             // errors from raft session
-	id               int                    // client ID for raft session
-	peers            []string               // raft peer URLs
+	id               uint64                 // client ID for raft session
+	members    	     map[uint64]*Member     // raft peer URLs
 	join             bool                   // node is joining an existing cluster
 	waldir           string                 // path to WAL directory
 	snapdir          string                 // path to snapshot directory
@@ -60,16 +67,47 @@ type RaftNode struct {
 	httpdonec        chan struct{} // signals http server shutdown complete
 }
 
-// NewRaftNode initiates a raft instance and returns a committed log entry
-// channel and error channel. Proposals for log updates are sent over the
-// provided the proposal channel. All log entries are replayed over the
-// commit channel, followed by a nil message (to indicate the channel is
-// current), then new log entries. To shutdown, close proposeC and read errorC.
-func NewRaftNode(id int,
-	peers []string,
+func  (rc *RaftNode)NewMembers(advertise,cluster string) error {
+	urlsmap := strings.Split(cluster, ",")
+	if len(urlsmap)%2 == 0 {
+		return fmt.Errorf("Only odd number of manage are supported!")
+	}
+	found := false
+	for _, urls := range urlsmap {
+		m := &Member{
+			Urls:urls,
+		}
+		var b []byte
+		b = append(b, []byte(urls)...)
+		hash := sha1.Sum(b)
+		m.ID = binary.BigEndian.Uint64(hash[:8])
+
+		if _, ok := rc.members[m.ID]; ok {
+			return fmt.Errorf("member exists with identical ID %v", m)
+		}
+		if uint64(m.ID) == raft.None {
+			return fmt.Errorf("cannot use %x as member id", raft.None)
+		}
+		if advertise == urls {
+			rc.id = m.ID
+			found = true
+		}
+		rc.members[m.ID] = m
+	}
+	if !found {
+		return fmt.Errorf("Not found advertise urls")
+	}
+
+	return nil
+}
+
+// NewRaftNode initiates a raft
+func NewRaftNode(
+	advertise string,
+	cluster string,
 	join bool,
 	metaDir string,
-	getSnapshot func() ([]byte, error)) *RaftNode {
+	getSnapshot func() ([]byte, error)) (*RaftNode, error) {
 
 	if _, err := os.Stat(metaDir); err != nil {
 		if !os.IsExist(err) {
@@ -78,24 +116,26 @@ func NewRaftNode(id int,
 	}
 
 	rc := &RaftNode{
-		id:               id,
-		peers:            peers,
+		members:          make(map[uint64]*Member),
 		join:             join,
 		proposeC:         make(chan string),
 		confChangeC:      make(chan raftpb.ConfChange),
 		commitC:          make(chan *string),
 		errorC:           make(chan error),
-		waldir:           fmt.Sprintf("%s/wal-%d", metaDir, id),
-		snapdir:          fmt.Sprintf("%s/snapshot-%d", metaDir, id),
 		getSnapshot:      getSnapshot,
 		stopc:            make(chan struct{}),
 		httpstopc:        make(chan struct{}),
 		httpdonec:        make(chan struct{}),
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
 	}
+	if err := rc.NewMembers(advertise, cluster); err != nil {
+		return nil, err
+	}
+	rc.waldir = fmt.Sprintf("%s/wal-%d", metaDir,rc.id)
+	rc.snapdir = fmt.Sprintf("%s/snapshot-%d", metaDir, rc.id)
 
 	go rc.startRaft()
-	return rc
+	return rc, nil
 }
 
 // FileExist checking file
@@ -179,9 +219,9 @@ func (rc *RaftNode) startRaft() {
 	oldwal := FileExist(rc.waldir)
 	rc.wal = rc.replayWAL()
 
-	rpeers := make([]raft.Peer, len(rc.peers))
-	for i := range rpeers {
-		rpeers[i] = raft.Peer{ID: uint64(i + 1)}
+	rpeers := make([]raft.Peer, len(rc.members))
+	for _, mem := range rc.members {
+		rpeers = append(rpeers, raft.Peer{ID: uint64(mem.ID)})
 	}
 	c := &raft.Config{
 		ID:                        uint64(rc.id),
@@ -208,16 +248,14 @@ func (rc *RaftNode) startRaft() {
 		ClusterID:   0x1000,
 		Raft:        rc,
 		ServerStats: stats.NewServerStats("", ""),
-		LeaderStats: stats.NewLeaderStats(strconv.Itoa(rc.id)),
+		LeaderStats: stats.NewLeaderStats(fmt.Sprint("%ul", rc.id)),
 		ErrorC:      make(chan error),
 	}
 
 	rc.transport.Start()
 
-	for i := range rc.peers {
-		if i+1 != rc.id {
-			rc.transport.AddPeer(types.ID(i+1), []string{rc.peers[i]})
-		}
+	for _, mem := range rc.members {
+		rc.transport.AddPeer(types.ID(mem.ID), []string{mem.Urls})
 	}
 
 	go rc.serveRaft()
@@ -226,7 +264,7 @@ func (rc *RaftNode) startRaft() {
 
 // serveRaft RAFT监控服务
 func (rc *RaftNode) serveRaft() {
-	url, err := url.Parse(rc.peers[rc.id-1])
+	url, err := url.Parse(rc.members[rc.id].Urls)
 	if err != nil {
 		log.Fatalf("raftnode: Failed parsing URL (%v)", err)
 	}
@@ -510,13 +548,16 @@ func (rc *RaftNode) ReadStatus() (stat util.ClusterStatusResult) {
 	if nodestatus.Lead == uint64(rc.id) {
 		stat.IsLeader = true
 	}
-	url, err := url.Parse(rc.peers[nodestatus.Lead-1])
+	url, err := url.Parse(rc.members[nodestatus.Lead].Urls)
 	if err == nil {
 		stat.Leader = url.Host
 	} else {
 		log.Fatalf("raftnode: Failed parsing URL (%v)", err)
 	}
-	stat.Peers = rc.peers
+	for _, mem := range rc.members {
+		stat.Peers = append(stat.Peers, mem.Urls)
+	}
+
 
 	return stat
 }
