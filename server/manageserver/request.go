@@ -52,6 +52,6 @@ func (s *ManageServer) ClusterStatusHandler(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(bytes)
 
-	s.RNode.Propose("1","test")
+	s.RNode.Propose("1", "test")
 	return
 }

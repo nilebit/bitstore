@@ -30,18 +30,15 @@ import (
 )
 
 const (
-	// ElectionTickTime 选举超时
-	ElectionTickTime int = 10
-	// HeartbeatTickTime 心跳超时
-	HeartbeatTickTime int = 5
-	// MaxSizePerMsg 每包最大值
-	MaxSizePerMsg uint64 = 4194304
-    defaultSnapshotCount uint64 = 2
+	ElectionTickTime        int    = 10      // ElectionTickTime 选举超时
+	HeartbeatTickTime       int    = 5       // HeartbeatTickTime 心跳超时
+	MaxSizePerMsg           uint64 = 4194304 // MaxSizePerMsg 每包最大值
+	defaultSnapshotCount    uint64 = 2
 	snapshotCatchUpEntriesN uint64 = 1
 )
 
 type Member struct {
-	ID uint64
+	ID   uint64
 	Urls string
 }
 
@@ -52,7 +49,7 @@ type RaftNode struct {
 	commitC          chan *string           // entries committed to log
 	errorC           chan error             // errors from raft session
 	id               uint64                 // client ID for raft session
-	members    	     map[uint64]*Member     // raft peer URLs
+	members          map[uint64]*Member     // raft peer URLs
 	join             bool                   // node is joining an existing cluster
 	waldir           string                 // path to WAL directory
 	snapdir          string                 // path to snapshot directory
@@ -61,7 +58,7 @@ type RaftNode struct {
 	snapshotIndex    uint64
 	appliedIndex     uint64
 	node             raft.Node // raft backing for the commit/error channel
-	memoryStorage      *raft.MemoryStorage
+	memoryStorage    *raft.MemoryStorage
 	wal              *wal.WAL
 	snapshotter      *snap.Snapshotter
 	snapshotterReady chan *snap.Snapshotter // signals when snapshotter is ready
@@ -70,11 +67,11 @@ type RaftNode struct {
 	stopc            chan struct{} // signals proposal channel closed
 	httpstopc        chan struct{} // signals http server to shutdown
 	httpdonec        chan struct{} // signals http server shutdown complete
-	mu          	 sync.RWMutex
-	store     		 map[string]string // current committed key-value pairs
+	mu               sync.RWMutex
+	store            map[string]string // current committed key-value pairs
 }
 
-func  (rc *RaftNode)NewMembers(advertise,cluster string) error {
+func (rc *RaftNode) NewMembers(advertise, cluster string) error {
 	urlsmap := strings.Split(cluster, ",")
 	if len(urlsmap)%2 == 0 {
 		return fmt.Errorf("Only odd number of manage are supported!")
@@ -82,7 +79,7 @@ func  (rc *RaftNode)NewMembers(advertise,cluster string) error {
 	found := false
 	for _, urls := range urlsmap {
 		m := &Member{
-			Urls:urls,
+			Urls: urls,
 		}
 		var b []byte
 		b = append(b, []byte(urls)...)
@@ -131,14 +128,14 @@ func newRaftNode(
 		stopc:            make(chan struct{}),
 		httpstopc:        make(chan struct{}),
 		httpdonec:        make(chan struct{}),
-		store: make(map[string]string),
-		snapCount:   defaultSnapshotCount,
+		store:            make(map[string]string),
+		snapCount:        defaultSnapshotCount,
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
 	}
 	if err := rc.NewMembers(advertise, cluster); err != nil {
 		return nil, err
 	}
-	rc.waldir = fmt.Sprintf("%s/wal-%d", metaDir,rc.id)
+	rc.waldir = fmt.Sprintf("%s/wal-%d", metaDir, rc.id)
 	rc.snapdir = fmt.Sprintf("%s/snapshot-%d", metaDir, rc.id)
 
 	go rc.startRaft()
@@ -571,7 +568,6 @@ func (rc *RaftNode) ReadStatus() (stat util.ClusterStatusResult) {
 		stat.Peers = append(stat.Peers, mem.Urls)
 	}
 
-
 	return stat
 }
 
@@ -623,7 +619,6 @@ func (s *RaftNode) readCommits(commitC <-chan *string, errorC <-chan error) {
 		log.Fatal(err)
 	}
 }
-
 
 func (s *RaftNode) getSnapshot() ([]byte, error) {
 	s.mu.RLock()

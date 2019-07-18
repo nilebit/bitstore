@@ -10,6 +10,7 @@ import (
 	"github.com/nilebit/bitstore/server/diskserver"
 )
 
+// DNModule disk command
 var DNModule = &Command{
 	UsageLine: "disk -port=8001",
 	Short:     "start a disk node server",
@@ -17,14 +18,14 @@ var DNModule = &Command{
 }
 
 var (
-	dn = diskserver.NewDiskServer()
-	Folders *string
-	ManageNode *string
-	FolderMaxLimits *string
+	dn              = diskserver.NewDiskServer()
+	folders         *string
+	manageNode      *string
+	folderMaxLimits *string
 )
 
 func init() {
-	DNModule.Run = RunDN
+	DNModule.Run = runDN
 	dn.Port = DNModule.Flag.Int("port", 8080, "http listen port")
 	dn.Ip = DNModule.Flag.String("ip", "0.0.0.0", "ip or server name")
 	dn.Cluster = DNModule.Flag.String("cluster", "localhost:8000", "cluster server location")
@@ -33,21 +34,21 @@ func init() {
 	dn.Rack = DNModule.Flag.String("rack", "", "current volume server's rack name")
 	dn.Debug = DNModule.Flag.Bool("debug", false, "open debug")
 	dn.PulseSeconds = DNModule.Flag.Int("pulseSeconds", 5, "number of seconds between heartbeats, must be smaller than or equal to the manage's setting")
-	ManageNode = DNModule.Flag.String("manage", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]...")
-	Folders = DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]...")
-	FolderMaxLimits = DNModule.Flag.String("max", "1", "maximum numbers of File, count[,count]...")
+	manageNode = DNModule.Flag.String("manage", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]...")
+	folders = DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]...")
+	folderMaxLimits = DNModule.Flag.String("max", "1", "maximum numbers of File, count[,count]...")
 }
 
-func RunDN(md *Command, args []string) (ret bool) {
+func runDN(md *Command, args []string) (ret bool) {
 
 	if *dn.MaxCpu < 1 {
 		*dn.MaxCpu = runtime.NumCPU()
 	}
 	runtime.GOMAXPROCS(*dn.MaxCpu)
-	dn.ManageNode = strings.Split(*ManageNode, ",")
-	dn.Folders = strings.Split(*Folders, ",")
+	dn.ManageNode = strings.Split(*manageNode, ",")
+	dn.Folders = strings.Split(*folders, ",")
 
-	var tempFolderMaxLimits = strings.Split(*FolderMaxLimits, ",")
+	var tempFolderMaxLimits = strings.Split(*folderMaxLimits, ",")
 	for _, maxString := range tempFolderMaxLimits {
 		if max, e := strconv.Atoi(maxString); e == nil {
 			dn.FolderMaxLimits = append(dn.FolderMaxLimits, max)

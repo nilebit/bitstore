@@ -18,7 +18,7 @@ var MNModule = &Command{
 }
 
 func init() {
-	MNModule.Run = RunMN
+	MNModule.Run = runMN
 	mn.Port = MNModule.Flag.Int("port", 8000, "http listen port")
 	mn.IP = MNModule.Flag.String("ip", "127.0.0.1", "ip or server name")
 	mn.Advertise = MNModule.Flag.String("advertise-urls", "http://127.0.0.1:8100", "list of URLs to listen on for peer traffic.")
@@ -28,8 +28,8 @@ func init() {
 	mn.MaxCPU = MNModule.Flag.Int("maxCpu", 0, "maximum number of CPUs. 0 means all available CPUs")
 }
 
-// RunMN runing manage node
-func RunMN(cmd *Command, args []string) bool {
+// runMN runing manage node
+func runMN(cmd *Command, args []string) bool {
 	if *mn.MaxCPU < 1 {
 		*mn.MaxCPU = runtime.NumCPU()
 	}

@@ -1,6 +1,9 @@
 package manageserver
 
 import (
+	"net/http"
+	"strconv"
+
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"github.com/nilebit/bitstore/pb"
@@ -8,8 +11,6 @@ import (
 	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"net/http"
-	"strconv"
 )
 
 // ManageServer 管理节点结构
@@ -19,10 +20,10 @@ type ManageServer struct {
 	MetaFolder        *string
 	VolumeSizeLimitMB *uint
 	Cluster           *string
-	Advertise		  *string
+	Advertise         *string
 	MaxCPU            *int
 	Router            *mux.Router
-	RNode          	  *RaftNode
+	RNode             *RaftNode
 }
 
 func NewManageServer() *ManageServer {
