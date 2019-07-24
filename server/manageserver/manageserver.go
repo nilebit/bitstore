@@ -2,6 +2,7 @@ package manageserver
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -15,8 +16,6 @@ import (
 
 // ManageServer 管理节点结构
 type ManageServer struct {
-	IP                *string
-	Port              *int
 	MetaFolder        *string
 	VolumeSizeLimitMB *uint
 	Cluster           *string
@@ -49,7 +48,9 @@ func (s *ManageServer) StartServer() bool {
 		glog.Fatalf("manage node server failed to new raft node: %v", err)
 	}
 	// start a manage node server
-	listeningAddress := *s.IP + ":" + strconv.Itoa(*s.Port)
+	host, _ := url.Parse(*s.Advertise)
+	post, _ := strconv.Atoi(host.Port())
+	listeningAddress := host.Hostname() + ":" + strconv.Itoa(post-100)
 	listener, e := util.NewListener(listeningAddress, 0)
 	if e != nil {
 		glog.Fatalf("manage node server startup error: %v", e)

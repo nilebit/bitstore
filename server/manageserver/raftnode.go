@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -558,14 +559,18 @@ func (rc *RaftNode) ReadStatus() (stat util.ClusterStatusResult) {
 	if nodestatus.Lead == uint64(rc.id) {
 		stat.IsLeader = true
 	}
-	url, err := url.Parse(rc.members[nodestatus.Lead].Urls)
+	temp, err := url.Parse(rc.members[nodestatus.Lead].Urls)
 	if err == nil {
-		stat.Leader = url.Host
+		post, _ := strconv.Atoi(temp.Port())
+		stat.Leader = temp.Hostname() + ":" + strconv.Itoa(post-100)
 	} else {
 		log.Fatalf("raftnode: Failed parsing URL (%v)", err)
 	}
 	for _, mem := range rc.members {
-		stat.Peers = append(stat.Peers, mem.Urls)
+		temp, _ := url.Parse(mem.Urls)
+		post, _ := strconv.Atoi(temp.Port())
+		newHost := temp.Hostname() + ":" + strconv.Itoa(post-100)
+		stat.Peers = append(stat.Peers, newHost)
 	}
 
 	return stat
