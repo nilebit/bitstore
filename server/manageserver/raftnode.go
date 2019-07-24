@@ -216,7 +216,7 @@ func (rc *RaftNode) replayWAL() *wal.WAL {
 func (rc *RaftNode) startRaft() {
 	if !FileExist(rc.snapdir) {
 		if err := os.Mkdir(rc.snapdir, 0750); err != nil {
-			glog.Fatalf("raftnode: cannot create dir for snapshot (%v)", err)
+			glog.Fatalf("raft: cannot create dir for snapshot (%v)", err)
 		}
 	}
 	rc.snapshotter = snap.New(zap.NewExample(), rc.snapdir)

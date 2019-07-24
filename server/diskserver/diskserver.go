@@ -53,16 +53,18 @@ func (s *DiskServer) RegistRouter() {
 	s.Router = apiRouter
 }
 
+// CreateDiskOpt 创建新磁盘
 func (s *DiskServer) CreateDiskOpt() {
 	s.Disk = diskopt.NewDisk(s.Folders, s.FolderMaxLimits, *s.Ip, *s.Port)
-	s.Heartbeat()
+	// 保持与管理服务心跳
+	go s.Heartbeat()
 	return
 }
 
+// StartServer 启动服务
 func (s *DiskServer) StartServer() bool {
 	listeningAddress := *s.Ip + ":" + strconv.Itoa(*s.Port)
 	glog.V(0).Infoln("Start a disk server ", "at", listeningAddress)
-	// go s.heartbeat()
 
 	if err := http.ListenAndServe(listeningAddress, s.Router); err != nil {
 		glog.Fatalf("service fail to serve: %v", err)

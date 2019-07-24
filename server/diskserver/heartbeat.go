@@ -4,21 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/pb"
 	"github.com/nilebit/bitstore/util"
 	"google.golang.org/grpc"
-	"time"
 )
 
-func (s *DiskServer) ResetLeader() {
+func (s *DiskServer) resetLeader() {
 	if s.CurrentLeader != "" {
 		s.CurrentLeader = ""
 		glog.V(0).Infof("Resetting manage node leader.\n")
 	}
 }
 
-func (s *DiskServer) FindLeader() (leader string, err error) {
+func (s *DiskServer) findLeader() (leader string, err error) {
 	if len(s.ManageNode) == 0 {
 		return "", errors.New("No manage node found!")
 	}
@@ -46,12 +47,12 @@ func (s *DiskServer) FindLeader() (leader string, err error) {
 	return s.CurrentLeader, nil
 }
 
-func (s *DiskServer) ResetAndFindLeader() (leader string, err error) {
-	s.ResetLeader()
-	return s.FindLeader()
+func (s *DiskServer) resetAndFindLeader() (leader string, err error) {
+	s.resetLeader()
+	return s.findLeader()
 }
 
-func (s *DiskServer) CollectHeartbeat() *pb.Heartbeat {
+func (s *DiskServer) collectHeartbeat() *pb.Heartbeat {
 	var volumeMessages []*pb.VolumeInformationMessage
 	maxVolumeCount := 0
 	var maxFileKey uint64
@@ -88,7 +89,7 @@ func (s *DiskServer) CollectHeartbeat() *pb.Heartbeat {
 
 }
 
-func (s *DiskServer) DoHeartbeat(ctx context.Context, leader string, sleepInterval time.Duration) (newLeader string, err error) {
+func (s *DiskServer) doHeartbeat(ctx context.Context, leader string, sleepInterval time.Duration) (newLeader string, err error) {
 	grpcConection, err := util.GrpcDial(ctx, leader, grpc.WithInsecure())
 	if err != nil {
 		return "", fmt.Errorf("fail to dial %s : %v", leader, err)
@@ -102,8 +103,8 @@ func (s *DiskServer) DoHeartbeat(ctx context.Context, leader string, sleepInterv
 		return "", err
 	}
 	glog.V(0).Infof("Heartbeat to %s\n", leader)
+	// 接收与处理心跳
 	doneChan := make(chan error, 1)
-
 	go func() {
 		for {
 			in, err := stream.Recv()
@@ -124,7 +125,8 @@ func (s *DiskServer) DoHeartbeat(ctx context.Context, leader string, sleepInterv
 		}
 	}()
 
-	if err = stream.Send(s.CollectHeartbeat()); err != nil {
+	// 定时发送心跳
+	if err = stream.Send(s.collectHeartbeat()); err != nil {
 		glog.V(0).Infof("Disk Server Failed to send heart beat to leader(%s): %s", leader, err.Error())
 		return "", err
 	}
@@ -133,7 +135,7 @@ func (s *DiskServer) DoHeartbeat(ctx context.Context, leader string, sleepInterv
 		select {
 		case <-tickChan:
 			glog.V(4).Infof("Disk server %s:%d heartbeat\n", *(s.Ip), *(s.Port))
-			if err = stream.Send(s.CollectHeartbeat()); err != nil {
+			if err = stream.Send(s.collectHeartbeat()); err != nil {
 				glog.V(0).Infof("Disk Server Failed to send heart beat to leader(%s): %s", leader, err.Error())
 				return "", err
 			}
@@ -144,6 +146,7 @@ func (s *DiskServer) DoHeartbeat(ctx context.Context, leader string, sleepInterv
 	}
 }
 
+// Heartbeat 开启心跳
 func (s *DiskServer) Heartbeat() {
 	glog.V(0).Infof("Disk server bootstraps with Manage server.")
 	var err error
@@ -151,7 +154,7 @@ func (s *DiskServer) Heartbeat() {
 
 	for {
 		if newLeader == "" {
-			newLeader, err = s.ResetAndFindLeader()
+			newLeader, err = s.resetAndFindLeader()
 			if err != nil {
 				glog.Errorf("No Leader found: %s", err.Error())
 				time.Sleep(time.Duration(*s.PulseSeconds) * time.Second)
@@ -160,7 +163,7 @@ func (s *DiskServer) Heartbeat() {
 		}
 		glog.V(0).Infof("Disk server communicates with manage server(%s) by heartbeat \n", newLeader)
 
-		newLeader, err = s.DoHeartbeat(context.Background(), newLeader, time.Duration(*s.PulseSeconds)*time.Second)
+		newLeader, err = s.doHeartbeat(context.Background(), newLeader, time.Duration(*s.PulseSeconds)*time.Second)
 		if err != nil {
 			glog.V(0).Infof("heartbeat error: %s", err.Error())
 			time.Sleep(time.Duration(*s.PulseSeconds) * time.Second)
