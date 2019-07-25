@@ -17,7 +17,6 @@ const (
 type DiskServer struct {
 	Port            *int
 	Ip              *string
-	Cluster         *string
 	MaxCpu          *int
 	DataCenter      *string
 	Rack            *string

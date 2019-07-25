@@ -1,6 +1,8 @@
 package manageserver
 
 import (
+	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -9,9 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/nilebit/bitstore/pb"
 	"github.com/nilebit/bitstore/util"
-	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 // ManageServer 管理节点结构
@@ -39,6 +39,19 @@ func (s *ManageServer) RegistRouter() {
 	s.Router = apiRouter
 }
 
+func (s *ManageServer) newGrpcServer(addr string)  {
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	rpc := grpc.NewServer()
+	pb.RegisterSeaweedServer(rpc, s)
+	if err := rpc.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
+
 // StartServer start a rpc and http service
 func (s *ManageServer) StartServer() bool {
 	// raft server
@@ -48,28 +61,22 @@ func (s *ManageServer) StartServer() bool {
 		glog.Fatalf("manage node server failed to new raft node: %v", err)
 	}
 	// start a manage node server
-	host, _ := url.Parse(*s.Advertise)
-	post, _ := strconv.Atoi(host.Port())
-	listeningAddress := host.Hostname() + ":" + strconv.Itoa(post-100)
-	listener, e := util.NewListener(listeningAddress, 0)
+	address, _ := url.Parse(*s.Advertise)
+	raftPost, _ := strconv.Atoi(address.Port())
+	grpcPost := raftPost-100
+	httpPost := raftPost-200
+
+
+	go s.newGrpcServer(address.Hostname() + ":" + strconv.Itoa(grpcPost))
+	listener, e := util.NewListener( address.Hostname() + ":" + strconv.Itoa(httpPost), 0)
 	if e != nil {
 		glog.Fatalf("manage node server startup error: %v", e)
 	}
-	m := cmux.New(listener)
-	grpcL := m.Match(cmux.HTTP2HeaderField("content-type", "application/grpc"))
-	httpL := m.Match(cmux.Any())
-
-	// Create your protocol servers.
-	grpcS := grpc.NewServer()
-	pb.RegisterSeaweedServer(grpcS, s)
-	reflection.Register(grpcS)
-
 	httpS := &http.Server{Handler: s.Router}
 
-	go grpcS.Serve(grpcL)
-	go httpS.Serve(httpL)
-
-	if err := m.Serve(); err != nil {
+	glog.Info("Server address: %s, HTTP Port: %d, RPC Port:%d, Raft Port: ",
+		listener, address.Hostname(), httpPost,grpcPost,raftPost)
+	if err := httpS.Serve(listener); err != nil {
 		glog.Fatalf("manage node server failed to serve: %v", err)
 	}
 

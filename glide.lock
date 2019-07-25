@@ -1,5 +1,5 @@
-hash: 0329037bd70cb57c54503b8dc6349606bc16379cac0a017996631a9514f6efaa
-updated: 2019-06-10T17:13:11.772358+08:00
+hash: fd59ab4a34211880c32b86fe97169c795c884b6d0ba3b1a0dda41aeef688fa00
+updated: 2019-07-25T16:26:08.117761+08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4b2b341e8d7715fae06375aa633dbb6e91b3fb46
@@ -33,7 +33,6 @@ imports:
   version: b5d812f8a3706043e23a9cd5babf2e5423744d30
   subpackages:
   - proto
-  - protoc-gen-go/descriptor
   - ptypes
   - ptypes/any
   - ptypes/duration
@@ -110,7 +109,6 @@ imports:
 - name: golang.org/x/net
   version: 461777fb6f67e8cb9d70cda16573678d085a74cf
   subpackages:
-  - context
   - http/httpguts
   - http2
   - http2/hpack
@@ -137,7 +135,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 501c41df7f472c740d0674ff27122f3f48c80ce7
+  version: 1d89a3c832915b2314551c1d2a506874d62e53f7
   subpackages:
   - balancer
   - balancer/base
@@ -164,11 +162,10 @@ imports:
   - metadata
   - naming
   - peer
-  - reflection
-  - reflection/grpc_reflection_v1alpha
   - resolver
   - resolver/dns
   - resolver/passthrough
+  - serviceconfig
   - stats
   - status
   - tap

@@ -28,7 +28,6 @@ func init() {
 	DNModule.Run = runDN
 	dn.Port = DNModule.Flag.Int("port", 8001, "http listen port")
 	dn.Ip = DNModule.Flag.String("ip", "0.0.0.0", "ip or server name")
-	dn.Cluster = DNModule.Flag.String("cluster", "localhost:8000", "cluster server location")
 	dn.MaxCpu = DNModule.Flag.Int("maxCpu", 0, "maximum number of CPUs. 0 means all available CPUs")
 	dn.DataCenter = DNModule.Flag.String("dataCenter", "", "current dss server's data center name")
 	dn.Rack = DNModule.Flag.String("rack", "", "current volume server's rack name")

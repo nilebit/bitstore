@@ -2,6 +2,7 @@ package manageserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"runtime"
 	"runtime/debug"
@@ -31,11 +32,16 @@ func (s *ManageServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SendHeartbeat deal Heartbeat
-func (s *ManageServer) SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error {
+func (s *ManageServer)SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error  {
 	for {
-		_, err := stream.Recv()
+		heartbeat, err := stream.Recv()
 		if err != nil {
-
+			fmt.Println(heartbeat)
+			if err := stream.Send(&pb.HeartbeatResponse{
+				Leader: s.RNode.ReadStatus().Leader,
+			}); err != nil {
+				return err
+			}
 		}
 	}
 }

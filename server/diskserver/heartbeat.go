@@ -47,11 +47,6 @@ func (s *DiskServer) findLeader() (leader string, err error) {
 	return s.CurrentLeader, nil
 }
 
-func (s *DiskServer) resetAndFindLeader() (leader string, err error) {
-	s.resetLeader()
-	return s.findLeader()
-}
-
 func (s *DiskServer) collectHeartbeat() *pb.Heartbeat {
 	var volumeMessages []*pb.VolumeInformationMessage
 	maxVolumeCount := 0
@@ -89,20 +84,20 @@ func (s *DiskServer) collectHeartbeat() *pb.Heartbeat {
 
 }
 
-func (s *DiskServer) doHeartbeat(ctx context.Context, leader string, sleepInterval time.Duration) (newLeader string, err error) {
-	grpcConection, err := util.GrpcDial(ctx, leader, grpc.WithInsecure())
+func (s *DiskServer) doHeartbeat(ctx context.Context, sleepInterval time.Duration) (err error) {
+	grpcConection, err := grpc.Dial(s.CurrentLeader, grpc.WithInsecure())
 	if err != nil {
-		return "", fmt.Errorf("fail to dial %s : %v", leader, err)
+		return fmt.Errorf("fail to dial: %v", err)
 	}
 	defer grpcConection.Close()
 
 	client := pb.NewSeaweedClient(grpcConection)
 	stream, err := client.SendHeartbeat(ctx)
 	if err != nil {
-		glog.V(0).Infof("SendHeartbeat to %s: %v", leader, err)
-		return "", err
+		glog.V(0).Infof("%v.SendHeartbeat(_) = _, %v", client, err)
+		return err
 	}
-	glog.V(0).Infof("Heartbeat to %s\n", leader)
+
 	// 接收与处理心跳
 	doneChan := make(chan error, 1)
 	go func() {
@@ -116,9 +111,9 @@ func (s *DiskServer) doHeartbeat(ctx context.Context, leader string, sleepInterv
 				s.Disk.VolumeSizeLimit = in.GetVolumeSizeLimit()
 			}
 
-			if in.GetLeader() != "" && leader != in.GetLeader() {
-				glog.V(0).Infof("Disk server found a new master leader: %s instead of %s \n", in.GetLeader(), leader)
-				newLeader = in.GetLeader()
+			if in.GetLeader() != "" && s.CurrentLeader != in.GetLeader() {
+				glog.V(0).Infof("Disk server found a new master leader: %s instead of %s \n", in.GetLeader(), s.CurrentLeader)
+				s.CurrentLeader = in.GetLeader()
 				doneChan <- nil
 				return
 			}
@@ -127,8 +122,8 @@ func (s *DiskServer) doHeartbeat(ctx context.Context, leader string, sleepInterv
 
 	// 定时发送心跳
 	if err = stream.Send(s.collectHeartbeat()); err != nil {
-		glog.V(0).Infof("Disk Server Failed to send heart beat to leader(%s): %s", leader, err.Error())
-		return "", err
+		glog.V(0).Infof("Disk Server Failed to send heart beat to leader(%s): %s", s.CurrentLeader, err.Error())
+		return  err
 	}
 	tickChan := time.Tick(sleepInterval)
 	for {
@@ -136,8 +131,8 @@ func (s *DiskServer) doHeartbeat(ctx context.Context, leader string, sleepInterv
 		case <-tickChan:
 			glog.V(4).Infof("Disk server %s:%d heartbeat\n", *(s.Ip), *(s.Port))
 			if err = stream.Send(s.collectHeartbeat()); err != nil {
-				glog.V(0).Infof("Disk Server Failed to send heart beat to leader(%s): %s", leader, err.Error())
-				return "", err
+				glog.V(0).Infof("Disk Server Failed to send heart beat to leader(%s): %s", s.CurrentLeader, err.Error())
+				return err
 			}
 		case err = <-doneChan:
 			glog.V(0).Infof("Disk server heart beat stops with %v\n", err)
@@ -150,24 +145,21 @@ func (s *DiskServer) doHeartbeat(ctx context.Context, leader string, sleepInterv
 func (s *DiskServer) Heartbeat() {
 	glog.V(0).Infof("Disk server bootstraps with Manage server.")
 	var err error
-	var newLeader string
 
 	for {
-		if newLeader == "" {
-			newLeader, err = s.resetAndFindLeader()
-			if err != nil {
+		if s.CurrentLeader == "" {
+			s.resetLeader()
+			if s.CurrentLeader, err = s.findLeader(); err != nil {
 				glog.Errorf("No Leader found: %s", err.Error())
 				time.Sleep(time.Duration(*s.PulseSeconds) * time.Second)
-				continue
 			}
 		}
-		glog.V(0).Infof("Disk server communicates with manage server(%s) by heartbeat \n", newLeader)
+		glog.V(0).Infof("Disk server communicates with manage server(%s) by heartbeat \n", s.CurrentLeader)
 
-		newLeader, err = s.doHeartbeat(context.Background(), newLeader, time.Duration(*s.PulseSeconds)*time.Second)
+		err := s.doHeartbeat(context.Background(), time.Duration(*s.PulseSeconds)*time.Second)
 		if err != nil {
 			glog.V(0).Infof("heartbeat error: %s", err.Error())
 			time.Sleep(time.Duration(*s.PulseSeconds) * time.Second)
-			newLeader = ""
 		}
 	}
 }
