@@ -1,6 +1,8 @@
 package manageserver
 
 import (
+	"github.com/soheilhy/cmux"
+	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"net/http"
@@ -63,20 +65,28 @@ func (s *ManageServer) StartServer() bool {
 	// start a manage node server
 	address, _ := url.Parse(*s.Advertise)
 	raftPost, _ := strconv.Atoi(address.Port())
-	grpcPost := raftPost-100
-	httpPost := raftPost-200
+	httpPost := raftPost-100
 
-
-	go s.newGrpcServer(address.Hostname() + ":" + strconv.Itoa(grpcPost))
 	listener, e := util.NewListener( address.Hostname() + ":" + strconv.Itoa(httpPost), 0)
 	if e != nil {
 		glog.Fatalf("manage node server startup error: %v", e)
 	}
+
+	m := cmux.New(listener)
+	grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
+	httpL := m.Match(cmux.Any())
+
+	// Create your protocol servers.
+	grpcS := grpc.NewServer()
+	pb.RegisterSeaweedServer(grpcS, s)
+	reflection.Register(grpcS)
+
 	httpS := &http.Server{Handler: s.Router}
 
-	glog.Info("Server address: %s, HTTP Port: %d, RPC Port:%d, Raft Port: ",
-		listener, address.Hostname(), httpPost,grpcPost,raftPost)
-	if err := httpS.Serve(listener); err != nil {
+	go grpcS.Serve(grpcL)
+	go httpS.Serve(httpL)
+
+	if err := m.Serve(); err != nil {
 		glog.Fatalf("manage node server failed to serve: %v", err)
 	}
 

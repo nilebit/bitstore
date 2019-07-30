@@ -3,6 +3,8 @@ package manageserver
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/golang/glog"
+	"github.com/nilebit/bitstore/diskopt/volume"
 	"net/http"
 	"runtime"
 	"runtime/debug"
@@ -36,13 +38,25 @@ func (s *ManageServer)SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error
 	for {
 		heartbeat, err := stream.Recv()
 		if err != nil {
-			fmt.Println(heartbeat)
-			if err := stream.Send(&pb.HeartbeatResponse{
-				Leader: s.RNode.ReadStatus().Leader,
-			}); err != nil {
-				return err
+			return err
+		}
+		var volumeInfos []volume.VolumeInfo
+		for _, v := range heartbeat.Volumes {
+			if vi, err := volume.NewVolumeInfo(v); err == nil {
+				volumeInfos = append(volumeInfos, vi)
+			} else {
+				glog.V(0).Infof("Fail to convert joined volume information: %v", err)
 			}
 		}
+
+		hb, _ := json.Marshal(heartbeat)
+		fmt.Println(hb)
+		if err := stream.Send(&pb.HeartbeatResponse{
+			Leader: s.RNode.ReadStatus().Leader,
+		}); err != nil {
+			return err
+		}
+
 	}
 }
 
@@ -58,6 +72,6 @@ func (s *ManageServer) ClusterStatusHandler(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(bytes)
 
-//	s.RNode.Propose("1", "test")
+	s.RNode.Propose("1", "test")
 	return
 }
