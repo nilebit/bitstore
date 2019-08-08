@@ -69,7 +69,7 @@ type RaftNode struct {
 	httpstopc        chan struct{} // signals http server to shutdown
 	httpdonec        chan struct{} // signals http server shutdown complete
 	mu               sync.RWMutex
-	store            map[string]string // current committed key-value pairs
+	store            map[string]*DataCenter // current committed key-value pairs
 }
 
 func (rc *RaftNode) NewMembers(advertise, cluster string) error {
@@ -129,7 +129,7 @@ func newRaftNode(
 		stopc:            make(chan struct{}),
 		httpstopc:        make(chan struct{}),
 		httpdonec:        make(chan struct{}),
-		store:            make(map[string]string),
+		store:            make(map[string]*DataCenter),
 		snapCount:        defaultSnapshotCount,
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
 	}
@@ -578,11 +578,11 @@ func (rc *RaftNode) ReadStatus() (stat util.ClusterStatusResult) {
 
 type kv struct {
 	Key string
-	Val string
+	Val DataCenter
 }
 
 func (s *RaftNode) recoverFromSnapshot(snapshot []byte) error {
-	var store map[string]string
+	var store map[string]*DataCenter
 	if err := json.Unmarshal(snapshot, &store); err != nil {
 		return err
 	}
@@ -617,7 +617,7 @@ func (s *RaftNode) readCommits(commitC <-chan *string, errorC <-chan error) {
 			log.Fatalf("raftexample: could not decode message (%v)", err)
 		}
 		s.mu.Lock()
-		s.store[dataKv.Key] = dataKv.Val
+		s.store[dataKv.Key] = &(dataKv.Val)
 		s.mu.Unlock()
 	}
 	if err, ok := <-errorC; ok {
@@ -631,7 +631,7 @@ func (s *RaftNode) getSnapshot() ([]byte, error) {
 	return json.Marshal(s.store)
 }
 
-func (s *RaftNode) Propose(k string, v string) {
+func (s *RaftNode) Propose(k string, v DataCenter) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(kv{k, v}); err != nil {
 		glog.Fatal(err)
@@ -639,7 +639,7 @@ func (s *RaftNode) Propose(k string, v string) {
 	s.proposeC <- buf.String()
 }
 
-func (s *RaftNode) Lookup(key string) (string, bool) {
+func (s *RaftNode) Lookup(key string) (*DataCenter, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v, ok := s.store[key]

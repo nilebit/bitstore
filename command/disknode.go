@@ -35,7 +35,7 @@ func init() {
 	dn.PulseSeconds = DNModule.Flag.Int("pulseSeconds", 5, "number of seconds between heartbeats, must be smaller than or equal to the manage's setting")
 	manageNode = DNModule.Flag.String("manage", "localhost:8000", "comma-separated manage node servers. manageNode1[,manageNode2]...")
 	folders = DNModule.Flag.String("dir", os.TempDir(), "directories to store data files. dir[,dir]...")
-	folderMaxLimits = DNModule.Flag.String("max", "1", "maximum numbers of File, count[,count]...")
+	folderMaxLimits = DNModule.Flag.String("max", "10", "maximum numbers of File, count[,count]...")
 }
 
 func runDN(md *Command, args []string) (ret bool) {
