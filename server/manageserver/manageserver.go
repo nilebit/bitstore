@@ -37,6 +37,7 @@ func (s *ManageServer) RegistRouter() {
 	apiRouter := paramMux.NewRoute().PathPrefix("/").Subrouter()
 	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.StatusHandler)
 	apiRouter.Methods("GET").Path("/cluster/status").HandlerFunc(s.ClusterStatusHandler)
+	apiRouter.Methods("GET").Path("/dir/status").HandlerFunc(s.DirStatusHandler)
 
 	s.Router = apiRouter
 }

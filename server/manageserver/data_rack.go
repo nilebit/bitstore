@@ -4,9 +4,9 @@ var DefaultRackName = "DefaultRack"
 
 type DataRack struct {
 	baseNodeInfo
-	dataNode 	      	  map[string]*DataNode
+	DataNode 	      	  map[string]*DataNode  `json:"DataNodes"`
 }
 
 func NewRack() *DataRack {
-	return &DataRack{dataNode: map[string]*DataNode{}}
+	return &DataRack{DataNode: map[string]*DataNode{}}
 }

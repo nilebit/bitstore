@@ -13,16 +13,16 @@ import (
 )
 
 type VolumeInfo struct {
-	Id               util.VIDType
-	Size             uint64
+	Id               util.VIDType `json:"ID"`
+	Size             uint64 `json:"Size"`
 	ReplicaPlacement *replicate.Placement
-	Ttl              *ttl.TTL
+	Ttl              *ttl.TTL `json:"TTL"`
 	Collection       string
-	Version          version.Version
-	FileCount        int
-	DeleteCount      int
-	DeletedByteCount uint64
-	ReadOnly         bool
+	Version          version.Version `json:"Version"`
+	FileCount        int `json:"FileCount"`
+	DeleteCount      int `json:"DeleteCount"`
+	DeletedByteCount uint64 `json:"DeletedByteCount"`
+	ReadOnly         bool `json:"ReadOnly"`
 }
 
 func NewVolumeInfo(m *pb.VolumeInformationMessage) (vi VolumeInfo, err error) {

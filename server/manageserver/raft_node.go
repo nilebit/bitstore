@@ -69,7 +69,7 @@ type RaftNode struct {
 	httpstopc        chan struct{} // signals http server to shutdown
 	httpdonec        chan struct{} // signals http server shutdown complete
 	mu               sync.RWMutex
-	store            map[string]*DataCenter // current committed key-value pairs
+	store            map[string]*DataCenter `json:"DataCenters"` // current committed key-value pairs
 }
 
 func (rc *RaftNode) NewMembers(advertise, cluster string) error {

@@ -9,7 +9,8 @@ import (
 type baseNodeInfo struct {
 	volumeCount       int
 	activeVolumeCount int
-	maxVolumeCount    int
+	MaxVolumeCount    int   `json:"Max"`
+	FreeVolumeCount   int   `json:"Free"`
 	maxVolumeId       util.VIDType
 }
 
@@ -17,11 +18,11 @@ type DataNode struct {
 	id            	  string
 	baseNodeInfo
 	sync.RWMutex
-	volumeInfos 	  map[util.VIDType]*volume.VolumeInfo
+	VolumeInfos 	  map[util.VIDType]*volume.VolumeInfo
 	lastHeartbeat	  int64
 }
 
 func NewDataNode(id string) *DataNode {
-	return &DataNode{id:id, volumeInfos: map[util.VIDType]*volume.VolumeInfo{}}
+	return &DataNode{id:id, VolumeInfos: map[util.VIDType]*volume.VolumeInfo{}}
 }
 

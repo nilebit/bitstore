@@ -49,36 +49,52 @@ func (s *ManageServer) updateStore(hb *pb.Heartbeat) bool {
 	if hb.Rack == "" {
 		hb.Rack = DefaultRackName
 	}
-	_, has = s.RNode.store[hb.DataCenter].dataRack[hb.Rack]
+	_, has = s.RNode.store[hb.DataCenter].DataRack[hb.Rack]
 	if has == false {
-		s.RNode.store[hb.DataCenter].dataRack[hb.Rack] = NewRack()
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack] = NewRack()
 	}
 
 	diskId := hb.Ip + ":" + strconv.Itoa(int(hb.Port))
-	_, has = s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId]
+	_, has = s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId]
 	if has == false {
-		s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId] = NewDataNode(diskId)
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId] = NewDataNode(diskId)
 	}
-	s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId].lastHeartbeat = model.Now().Unix()
+	s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].lastHeartbeat = model.Now().Unix()
 
 	for _, v := range hb.Volumes {
 		if vi, err := volume.NewVolumeInfo(v); err == nil {
-			s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId].volumeInfos[vi.Id] = &vi
+			s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].VolumeInfos[vi.Id] = &vi
 		} else {
 			glog.V(0).Infof("Fail to convert joined volume information: %v", err)
 		}
 	}
 	// update max volume count
-	if count := int(hb.MaxVolumeCount) - s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId].maxVolumeCount;count != 0 {
-		s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId].maxVolumeCount += count
-		s.RNode.store[hb.DataCenter].dataRack[hb.Rack].maxVolumeCount += count
-		s.RNode.store[hb.DataCenter].maxVolumeCount += count
+	freeChange := false
+	if count := int(hb.MaxVolumeCount) - s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].MaxVolumeCount;count != 0 {
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].MaxVolumeCount += count
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack].MaxVolumeCount += count
+		s.RNode.store[hb.DataCenter].MaxVolumeCount += count
+		freeChange = true
 	}
 
-	if count := int(len(hb.Volumes)) - s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId].volumeCount;count != 0 {
-		s.RNode.store[hb.DataCenter].dataRack[hb.Rack].dataNode[diskId].volumeCount += count
-		s.RNode.store[hb.DataCenter].dataRack[hb.Rack].volumeCount += count
+	if count := int(len(hb.Volumes)) - s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].volumeCount;count != 0 {
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].volumeCount += count
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack].volumeCount += count
 		s.RNode.store[hb.DataCenter].volumeCount += count
+		freeChange = true
+	}
+
+	if freeChange == true {
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].FreeVolumeCount =
+			s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].MaxVolumeCount -
+				s.RNode.store[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].volumeCount
+		s.RNode.store[hb.DataCenter].DataRack[hb.Rack].FreeVolumeCount =
+			s.RNode.store[hb.DataCenter].DataRack[hb.Rack].MaxVolumeCount -
+				s.RNode.store[hb.DataCenter].DataRack[hb.Rack].volumeCount
+		s.RNode.store[hb.DataCenter].FreeVolumeCount =
+			s.RNode.store[hb.DataCenter].MaxVolumeCount -
+				s.RNode.store[hb.DataCenter].volumeCount
+
 	}
 
 	return true
@@ -122,5 +138,18 @@ func (s *ManageServer) ClusterStatusHandler(w http.ResponseWriter, r *http.Reque
 	_, err = w.Write(bytes)
 
 //	s.RNode.Propose("1", "test")
+	return
+}
+
+// DirStatusHandler dir status
+func (s *ManageServer) DirStatusHandler(w http.ResponseWriter, r *http.Request) {
+	bytes, err := json.Marshal(&s.RNode.store)
+	if err != nil {
+		bytes = []byte("json marshal error")
+	}
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(bytes)
+
 	return
 }

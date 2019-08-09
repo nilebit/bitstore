@@ -1,12 +1,12 @@
 package manageserver
 
-var DefaultCenterName = "DefaultDataCenter"
+var DefaultCenterName = "DefaultCenter"
 
 type DataCenter struct {
 	baseNodeInfo
-	dataRack 			  map[string]*DataRack
+	DataRack 			  map[string]*DataRack    `json:"Racks"`
 }
 
 func NewDataCenter() *DataCenter {
-	return &DataCenter{dataRack: map[string]*DataRack{}}
+	return &DataCenter{DataRack: map[string]*DataRack{}}
 }
