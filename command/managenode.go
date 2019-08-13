@@ -24,6 +24,7 @@ func init() {
 	mn.VolumeSizeLimitMB = MNModule.Flag.Uint("volumeSizeLimitMB", 30000, "Manage stops directing writes to oversized volumes.")
 	mn.MetaFolder = MNModule.Flag.String("mdir", "./data", "data directory to store meta data")
 	mn.MaxCPU = MNModule.Flag.Int("maxCpu", 0, "maximum number of CPUs. 0 means all available CPUs")
+	mn.DefaultReplicaPlacement = MNModule.Flag.String("defaultReplication", "000", "Default replication type if not specified.")
 }
 
 // runMN runing manage node

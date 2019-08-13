@@ -69,7 +69,7 @@ type RaftNode struct {
 	httpstopc        chan struct{} // signals http server to shutdown
 	httpdonec        chan struct{} // signals http server shutdown complete
 	mu               sync.RWMutex
-	store            map[string]*DataCenter `json:"DataCenters"` // current committed key-value pairs
+	store            DataCenters
 }
 
 func (rc *RaftNode) NewMembers(advertise, cluster string) error {
@@ -129,7 +129,7 @@ func newRaftNode(
 		stopc:            make(chan struct{}),
 		httpstopc:        make(chan struct{}),
 		httpdonec:        make(chan struct{}),
-		store:            make(map[string]*DataCenter),
+		store:            DataCenters{DataCenters: map[string]*DataCenter{}},
 		snapCount:        defaultSnapshotCount,
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
 	}
@@ -582,7 +582,7 @@ type kv struct {
 }
 
 func (s *RaftNode) recoverFromSnapshot(snapshot []byte) error {
-	var store map[string]*DataCenter
+	var store DataCenters
 	if err := json.Unmarshal(snapshot, &store); err != nil {
 		return err
 	}
@@ -617,7 +617,7 @@ func (s *RaftNode) readCommits(commitC <-chan *string, errorC <-chan error) {
 			log.Fatalf("raftexample: could not decode message (%v)", err)
 		}
 		s.mu.Lock()
-		s.store[dataKv.Key] = &(dataKv.Val)
+		s.store.DataCenters[dataKv.Key] = &(dataKv.Val)
 		s.mu.Unlock()
 	}
 	if err, ok := <-errorC; ok {
@@ -642,6 +642,12 @@ func (s *RaftNode) Propose(k string, v DataCenter) {
 func (s *RaftNode) Lookup(key string) (*DataCenter, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	v, ok := s.store[key]
+	v, ok := s.store.DataCenters[key]
 	return v, ok
+}
+
+func (s *RaftNode) FreeSpace() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.store.MaxVolumeCount - s.store.volumeCount
 }

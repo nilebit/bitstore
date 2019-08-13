@@ -25,6 +25,7 @@ type ManageServer struct {
 	MaxCPU            *int
 	Router            *mux.Router
 	RNode             *RaftNode
+	DefaultReplicaPlacement *string
 }
 
 func NewManageServer() *ManageServer {
@@ -38,6 +39,7 @@ func (s *ManageServer) RegistRouter() {
 	apiRouter.Methods("GET").Path("/status").HandlerFunc(s.StatusHandler)
 	apiRouter.Methods("GET").Path("/cluster/status").HandlerFunc(s.ClusterStatusHandler)
 	apiRouter.Methods("GET").Path("/dir/status").HandlerFunc(s.DirStatusHandler)
+	apiRouter.Methods("GET").Path("/vol/grow").HandlerFunc(s.VolGrowHandler)
 
 	s.Router = apiRouter
 }
