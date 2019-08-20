@@ -200,7 +200,7 @@ func (s *ManageServer) VolGrowHandler(w http.ResponseWriter, r *http.Request) {
 				strconv.Itoa(count*option.ReplicaPlacement.GetCopyCount()))
 		} else {
 			//  TODO
-			// count, err = s.GrowByCountAndType(count, option)
+			//count, err = s.GrowByCountAndType(count, option)
 		}
 	} else {
 		err = errors.New("parameter count is not found")
