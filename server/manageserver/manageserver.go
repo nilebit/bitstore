@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
@@ -15,6 +16,11 @@ import (
 	"github.com/nilebit/bitstore/util"
 	"google.golang.org/grpc"
 )
+
+type IDC struct {
+	baseNodeInfo
+	DataCenters map[string]*DataCenter `json:"DataCenters"`
+}
 
 // ManageServer 管理节点结构
 type ManageServer struct {
@@ -25,11 +31,13 @@ type ManageServer struct {
 	MaxCPU            *int
 	Router            *mux.Router
 	RNode             *RaftNode
+	IDCMtx            sync.RWMutex
+	IDC               IDC
 	DefaultReplicaPlacement *string
 }
 
 func NewManageServer() *ManageServer {
-	return &ManageServer{}
+	return &ManageServer{IDC:IDC{DataCenters: map[string]*DataCenter{}}}
 }
 
 // RegistRouter 注册ROUTER
