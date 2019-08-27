@@ -3,18 +3,25 @@ package manageserver
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/golang/glog"
 	"github.com/nilebit/bitstore/diskopt/replicate"
 	"github.com/nilebit/bitstore/diskopt/ttl"
+	"github.com/nilebit/bitstore/diskopt/version"
 	"github.com/nilebit/bitstore/diskopt/volume"
 	"github.com/nilebit/bitstore/util"
 	"github.com/prometheus/common/model"
 	"net/http"
+	"net/url"
 	"runtime"
 	"runtime/debug"
 	"strconv"
 
 	"github.com/nilebit/bitstore/pb"
+)
+
+var (
+	MaxVolumeID = "max_volume_id"
 )
 
 // StatusHandler Server status
@@ -78,7 +85,7 @@ func (s *ManageServer) updateStore(hb *pb.Heartbeat) bool {
 	}
 	if maxID > s.IDC.maxVolumeId {
 		s.IDC.maxVolumeId = maxID
-		s.RNode.Propose("max_volume_id", strconv.Itoa(int(maxID)))
+		s.RNode.Propose(MaxVolumeID, strconv.Itoa(int(maxID)))
 	}
 
 	// update max volume count
@@ -111,7 +118,9 @@ func (s *ManageServer) updateStore(hb *pb.Heartbeat) bool {
 				s.IDC.DataCenters[hb.DataCenter].volumeCount
 		s.IDC.FreeVolumeCount = s.IDC.MaxVolumeCount - s.IDC.volumeCount
 	}
-
+	s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].Ip = hb.Ip
+	s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].Port = int(hb.Port)
+	s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].PublicUrl = hb.PublicUrl
 
 	return true
 }
@@ -195,10 +204,197 @@ func (s *ManageServer) getVolumeGrowOption(r *http.Request) (*volume.GrowOption,
 	return volumeGrowOption, nil
 }
 
-func (s *ManageServer) GrowByCountAndType(count int, option *volume.GrowOption) (int, error) {
-	// 获取MaxVolumeID
+func (s *ManageServer) getNodeForDiffCenter(count int) (servers []*DataNode, err error) {
+	if count > 0 && len(s.IDC.DataCenters) < count {
+		err = errors.New(fmt.Sprintf("Only has %d center, not enough for %d.", len(s.IDC.DataCenters), count))
+		return
+	}
+	for _, dcVal := range s.IDC.DataCenters {
+		if count <= 0 {
+			break
+		}
+		if dcVal.FreeVolumeCount <= 0 {
+			continue
+		}
+		for _, dcRack := range dcVal.DataRack {
+			if dcRack.FreeVolumeCount <= 0 {
+				continue
+			}
+			for _, dcNode := range dcRack.DataNode {
+				if dcNode.FreeVolumeCount <= 0 {
+					continue
+				}
+				servers = append(servers, dcNode)
+				break
+			}
+			break
+		}
+		count--
+	}
 
-	return 0, nil
+	return
+}
+
+func (s *ManageServer) getNodeForDiffRack(count int) (servers []*DataNode, err error) {
+	sum := count
+	for _, center := range s.IDC.DataCenters {
+		if center.FreeVolumeCount <= 0 {
+			continue
+		}
+		for _, dcRack := range center.DataRack {
+			if sum <= 0 {
+				break
+			}
+			if dcRack.FreeVolumeCount <= 0 {
+				continue
+			}
+			for _, dcNode := range dcRack.DataNode {
+				if dcNode.FreeVolumeCount <= 0 {
+					continue
+				}
+				servers = append(servers, dcNode)
+				break
+			}
+			sum--
+		}
+		if sum <= 0 {
+			break
+		}
+	}
+	if count > 0 {
+		err = errors.New(fmt.Sprintf("Only has %d center, not enough for %d.", len(s.IDC.DataCenters), count))
+	}
+
+	return
+}
+
+func (s *ManageServer) getNodeForSameRack(count int) (servers []*DataNode, err error) {
+	sum := count
+	for _, center := range s.IDC.DataCenters {
+		if center.FreeVolumeCount <= 0 {
+			continue
+		}
+		for _, dcRack := range center.DataRack {
+			if sum <= 0 {
+				break
+			}
+			if dcRack.FreeVolumeCount <= 0 {
+				continue
+			}
+			for _, dcNode := range dcRack.DataNode {
+				if dcNode.FreeVolumeCount <= 0 {
+					continue
+				}
+				servers = append(servers, dcNode)
+				break
+			}
+			sum--
+		}
+		if sum <= 0 {
+			break
+		}
+	}
+	if count > 0 {
+		err = errors.New(fmt.Sprintf("Only has %d center, not enough for %d.", len(s.IDC.DataCenters), count))
+	}
+
+	return
+}
+
+func (s *ManageServer) findFreeDataNode(option *volume.GrowOption) (nds []*DataNode, err error) {
+	rp := option.ReplicaPlacement
+	flag := true
+	if rp.DiffDataCenterCount > 0 && flag == true {
+		rp.DiffDataCenterCount += 1
+		flag = false
+	}
+	if rp.DiffRackCount > 0  && flag == true {
+		rp.DiffRackCount += 1
+		flag = false
+	}
+	if rp.SameRackCount > 0  && flag == true {
+		rp.DiffRackCount += 1
+	}
+	var tmpNds []*DataNode
+	// 获取不同中心节点
+	tmpNds, err = s.getNodeForDiffCenter(rp.DiffDataCenterCount)
+	if  err != nil {
+		return
+	}
+	for _, val := range tmpNds {
+		nds = append(nds, val)
+	}
+	// 获取不同机架节点
+	tmpNds, err = s.getNodeForDiffRack(rp.DiffRackCount)
+	if err != nil {
+		return
+	}
+	for _, val := range tmpNds {
+		nds = append(nds, val)
+	}
+	// 获取相同机架节点
+	tmpNds, err = s.getNodeForDiffRack(rp.DiffRackCount)
+	if err != nil {
+		return
+	}
+	for _, val := range tmpNds {
+		nds = append(nds, val)
+	}
+
+	return
+}
+
+func (s *ManageServer) AllocateVolume(dn *DataNode, vid util.VIDType, option *volume.GrowOption) error {
+	values := make(url.Values)
+	values.Add("volume", vid.String())
+	values.Add("collection", option.Collection)
+	values.Add("replication", option.ReplicaPlacement.String())
+	values.Add("ttl", option.Ttl.String())
+	jsonBlob, err := util.Post("http://"+ dn.Url() +"/admin/assign_volume", values)
+	if err != nil {
+		return err
+	}
+	type AllocateVolumeResult struct {
+		Error string
+	}
+	var ret AllocateVolumeResult
+	if err := json.Unmarshal(jsonBlob, &ret); err != nil {
+		return fmt.Errorf("Invalid JSON result for %s: %s", "/admin/assign_volum", string(jsonBlob))
+	}
+	if ret.Error != "" {
+		return errors.New(ret.Error)
+	}
+
+	return nil
+}
+
+func (s *ManageServer) GrowVolume(option *volume.GrowOption) (int, error) {
+	s.IDC.maxVolumeId += 1
+	s.RNode.Propose(MaxVolumeID, strconv.Itoa(int(s.IDC.maxVolumeId)))
+	servers, err := s.findFreeDataNode(option)
+	if err != nil {
+		return 0, err
+	}
+	addLen := 0
+	for _, server := range servers {
+		vi := volume.VolumeInfo{
+			Id:               s.IDC.maxVolumeId,
+			Size:             0,
+			Collection:       option.Collection,
+			ReplicaPlacement: option.ReplicaPlacement,
+			Ttl:              option.Ttl,
+			Version:          version.CurrentVersion,
+		}
+		if err := s.AllocateVolume(server, s.IDC.maxVolumeId, option); err == nil {
+			server.AddVolume(&vi)
+			addLen++
+		} else {
+			glog.V(0).Infoln("Failed to assign volume",  s.IDC.maxVolumeId, "to", servers, "error", err)
+			return  addLen, fmt.Errorf("Failed to assign %d: %v",  s.IDC.maxVolumeId, err)
+		}
+	}
+
+	return addLen, nil
 }
 
 func (s *ManageServer) VolGrowHandler(w http.ResponseWriter, r *http.Request) {
@@ -207,24 +403,29 @@ func (s *ManageServer) VolGrowHandler(w http.ResponseWriter, r *http.Request) {
 		util.WriteJsonError(w, r, http.StatusNotAcceptable, err)
 		return
 	}
-	var count int
+	var count,counter,c int
 	count, err = strconv.Atoi(r.FormValue("count"))
-	if err == nil {
-		if s.IDC.FreeVolumeCount < count * option.ReplicaPlacement.GetCopyCount() {
-			err = errors.New("Only " + strconv.Itoa(s.IDC.FreeVolumeCount) + " volumes left! Not enough for " +
-				strconv.Itoa(count*option.ReplicaPlacement.GetCopyCount()))
-		} else {
-			count, err = s.GrowByCountAndType(count, option)
-		}
-	} else {
-		err = errors.New("parameter count is not found")
+	if err != nil {
+		util.WriteJsonError(w, r, http.StatusNotAcceptable, errors.New("parameter count is not found"))
+		return
 	}
 
-	if err != nil {
+	if s.IDC.FreeVolumeCount < count * option.ReplicaPlacement.GetCopyCount() {
+		err = errors.New("Only " + strconv.Itoa(s.IDC.FreeVolumeCount) + " volumes left! Not enough for " +
+			strconv.Itoa(count*option.ReplicaPlacement.GetCopyCount()))
 		util.WriteJsonError(w, r, http.StatusNotAcceptable, err)
-	} else {
-		util.WriteJsonQuiet(w, r, http.StatusOK, map[string]interface{}{"count": count})
+		return
 	}
+
+	for i := 0; i < count; i++ {
+		if c, err = s.GrowVolume(option); err == nil {
+			counter += c
+		} else {
+			glog.Error("Failed to Grow Volume %s", err.Error())
+		}
+	}
+
+	util.WriteJsonQuiet(w, r, http.StatusOK, map[string]interface{}{"count": counter})
 
 	return
 }
