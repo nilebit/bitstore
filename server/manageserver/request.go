@@ -48,6 +48,9 @@ func (s *ManageServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 func (s *ManageServer) updateStore(hb *pb.Heartbeat) bool {
 	s.IDCMtx.Lock()
 	defer s.IDCMtx.Unlock()
+	var center *DataCenter
+	var rack *DataRack
+	var node *DataNode
 	if hb.DataCenter == "" {
 		hb.DataCenter = DefaultCenterName
 	}
@@ -56,21 +59,24 @@ func (s *ManageServer) updateStore(hb *pb.Heartbeat) bool {
 	if has == false {
 		s.IDC.DataCenters[hb.DataCenter] = NewDataCenter()
 	}
+	center = s.IDC.DataCenters[hb.DataCenter]
 
 	if hb.Rack == "" {
 		hb.Rack = DefaultRackName
 	}
-	_, has = s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack]
+	_, has = center.DataRack[hb.Rack]
 	if has == false {
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack] = NewRack()
+		center.DataRack[hb.Rack] = NewRack()
 	}
+	rack = center.DataRack[hb.Rack]
 
 	diskId := hb.Ip + ":" + strconv.Itoa(int(hb.Port))
-	_, has = s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId]
+	_, has =rack.DataNode[diskId]
 	if has == false {
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId] = NewDataNode(diskId)
+		rack.DataNode[diskId] = NewDataNode(diskId)
 	}
-	s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].lastHeartbeat = model.Now().Unix()
+	node = rack.DataNode[diskId]
+	node.lastHeartbeat = model.Now().Unix()
 
 	maxID := util.VIDType(0)
 	for _, v := range hb.Volumes {
@@ -78,55 +84,54 @@ func (s *ManageServer) updateStore(hb *pb.Heartbeat) bool {
 			if vi.Id > maxID {
 				maxID = vi.Id
 			}
-			s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].VolumeInfos[vi.Id] = &vi
+			node.VolumeInfos[vi.Id] = &vi
 		} else {
 			glog.V(0).Infof("Fail to convert joined volume information: %v", err)
 		}
 	}
-	if maxID > s.IDC.maxVolumeId {
-		s.IDC.maxVolumeId = maxID
+	if maxID > s.IDC.MaxVolumeId {
+		s.IDC.MaxVolumeId = maxID
 		s.RNode.Propose(MaxVolumeID, strconv.Itoa(int(maxID)))
 	}
 
 	// update max volume count
 	freeChange := false
-	if count := int(hb.MaxVolumeCount) - s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].MaxVolumeCount;count != 0 {
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].MaxVolumeCount += count
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].MaxVolumeCount += count
-		s.IDC.DataCenters[hb.DataCenter].MaxVolumeCount += count
+	if count := int(hb.MaxVolumeCount) - node.MaxVolumeCount;count != 0 {
+		node.MaxVolumeCount += count
+		rack.MaxVolumeCount += count
+		center.MaxVolumeCount += count
 		s.IDC.MaxVolumeCount += count
 		freeChange = true
 	}
 
-	if count := int(len(hb.Volumes)) - s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].volumeCount;count != 0 {
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].volumeCount += count
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].volumeCount += count
-		s.IDC.DataCenters[hb.DataCenter].volumeCount += count
+	if count := int(len(hb.Volumes)) - node.volumeCount;count != 0 {
+		node.volumeCount += count
+		rack.volumeCount += count
+		center.volumeCount += count
 		s.IDC.volumeCount += count
 		freeChange = true
 	}
 
 	if freeChange == true {
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].FreeVolumeCount =
-			s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].MaxVolumeCount -
-				s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].volumeCount
-		s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].FreeVolumeCount =
-			s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].MaxVolumeCount -
-				s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].volumeCount
-		s.IDC.DataCenters[hb.DataCenter].FreeVolumeCount =
-			s.IDC.DataCenters[hb.DataCenter].MaxVolumeCount -
-				s.IDC.DataCenters[hb.DataCenter].volumeCount
+		node.FreeVolumeCount = node.MaxVolumeCount - node.volumeCount
+		rack.FreeVolumeCount = rack.MaxVolumeCount - rack.volumeCount
+		center.FreeVolumeCount = center.MaxVolumeCount - center.volumeCount
 		s.IDC.FreeVolumeCount = s.IDC.MaxVolumeCount - s.IDC.volumeCount
 	}
-	s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].Ip = hb.Ip
-	s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].Port = int(hb.Port)
-	s.IDC.DataCenters[hb.DataCenter].DataRack[hb.Rack].DataNode[diskId].PublicUrl = hb.PublicUrl
+	node.Ip = hb.Ip
+	node.Port = int(hb.Port)
+	node.PublicUrl = hb.PublicUrl
 
 	return true
 }
 
 // SendHeartbeat 处理心跳入口
 func (s *ManageServer)SendHeartbeat(stream pb.Seaweed_SendHeartbeatServer) error  {
+	if key, has:= s.RNode.Lookup(MaxVolumeID);has {
+		maxVolumeID, _ := strconv.Atoi(key)
+		s.IDC.MaxVolumeId = util.VIDType(maxVolumeID)
+	}
+
 	for {
 		heartbeat, err := stream.Recv()
 		if err != nil {
@@ -261,7 +266,7 @@ func (s *ManageServer) getNodeForDiffRack(count int) (servers []*DataNode, err e
 			break
 		}
 	}
-	if count > 0 {
+	if sum > 0 {
 		err = errors.New(fmt.Sprintf("Only has %d center, not enough for %d.", len(s.IDC.DataCenters), count))
 	}
 
@@ -294,7 +299,7 @@ func (s *ManageServer) getNodeForSameRack(count int) (servers []*DataNode, err e
 			break
 		}
 	}
-	if count > 0 {
+	if sum > 0 {
 		err = errors.New(fmt.Sprintf("Only has %d center, not enough for %d.", len(s.IDC.DataCenters), count))
 	}
 
@@ -302,7 +307,10 @@ func (s *ManageServer) getNodeForSameRack(count int) (servers []*DataNode, err e
 }
 
 func (s *ManageServer) findFreeDataNode(option *volume.GrowOption) (nds []*DataNode, err error) {
-	rp := option.ReplicaPlacement
+	rp := replicate.Placement{
+		DiffDataCenterCount:option.ReplicaPlacement.DiffDataCenterCount,
+		DiffRackCount:option.ReplicaPlacement.DiffRackCount,
+		SameRackCount:option.ReplicaPlacement.SameRackCount}
 	flag := true
 	if rp.DiffDataCenterCount > 0 && flag == true {
 		rp.DiffDataCenterCount += 1
@@ -312,8 +320,8 @@ func (s *ManageServer) findFreeDataNode(option *volume.GrowOption) (nds []*DataN
 		rp.DiffRackCount += 1
 		flag = false
 	}
-	if rp.SameRackCount > 0  && flag == true {
-		rp.DiffRackCount += 1
+	if rp.SameRackCount >= 0  && flag == true {
+		rp.SameRackCount += 1
 	}
 	var tmpNds []*DataNode
 	// 获取不同中心节点
@@ -333,7 +341,7 @@ func (s *ManageServer) findFreeDataNode(option *volume.GrowOption) (nds []*DataN
 		nds = append(nds, val)
 	}
 	// 获取相同机架节点
-	tmpNds, err = s.getNodeForDiffRack(rp.DiffRackCount)
+	tmpNds, err = s.getNodeForDiffRack(rp.SameRackCount)
 	if err != nil {
 		return
 	}
@@ -369,8 +377,8 @@ func (s *ManageServer) AllocateVolume(dn *DataNode, vid util.VIDType, option *vo
 }
 
 func (s *ManageServer) GrowVolume(option *volume.GrowOption) (int, error) {
-	s.IDC.maxVolumeId += 1
-	s.RNode.Propose(MaxVolumeID, strconv.Itoa(int(s.IDC.maxVolumeId)))
+	s.IDC.MaxVolumeId += 1
+	s.RNode.Propose(MaxVolumeID, strconv.Itoa(int(s.IDC.MaxVolumeId)))
 	servers, err := s.findFreeDataNode(option)
 	if err != nil {
 		return 0, err
@@ -378,19 +386,19 @@ func (s *ManageServer) GrowVolume(option *volume.GrowOption) (int, error) {
 	addLen := 0
 	for _, server := range servers {
 		vi := volume.VolumeInfo{
-			Id:               s.IDC.maxVolumeId,
+			Id:               s.IDC.MaxVolumeId,
 			Size:             0,
 			Collection:       option.Collection,
 			ReplicaPlacement: option.ReplicaPlacement,
 			Ttl:              option.Ttl,
 			Version:          version.CurrentVersion,
 		}
-		if err := s.AllocateVolume(server, s.IDC.maxVolumeId, option); err == nil {
+		if err := s.AllocateVolume(server, s.IDC.MaxVolumeId, option); err == nil {
 			server.AddVolume(&vi)
 			addLen++
 		} else {
-			glog.V(0).Infoln("Failed to assign volume",  s.IDC.maxVolumeId, "to", servers, "error", err)
-			return  addLen, fmt.Errorf("Failed to assign %d: %v",  s.IDC.maxVolumeId, err)
+			glog.V(0).Infoln("Failed to assign volume",  s.IDC.MaxVolumeId, "to", servers, "error", err)
+			return  addLen, fmt.Errorf("Failed to assign %d: %v",  s.IDC.MaxVolumeId, err)
 		}
 	}
 

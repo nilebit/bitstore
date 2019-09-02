@@ -123,6 +123,7 @@ func newRaftNode(
 		httpdonec:        make(chan struct{}),
 		snapCount:        defaultSnapshotCount,
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
+		kvStore: 		  map[string]string{},
 	}
 	if err := rc.NewMembers(advertise, cluster); err != nil {
 		return nil, err

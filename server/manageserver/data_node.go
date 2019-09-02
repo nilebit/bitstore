@@ -12,7 +12,7 @@ type baseNodeInfo struct {
 	activeVolumeCount int
 	MaxVolumeCount    int   `json:"Max"`
 	FreeVolumeCount   int   `json:"Free"`
-	maxVolumeId       util.VIDType
+	MaxVolumeId       util.VIDType  `json:"-"`
 }
 
 type DataNode struct {
